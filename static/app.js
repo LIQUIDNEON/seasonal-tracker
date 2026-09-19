@@ -13,6 +13,8 @@ const state = {
 const $ = (sel) => document.querySelector(sel);
 const board = $("#board");
 
+const DAY_ACCENTS = ["#7ad0ff", "#8b7bff", "#3dd68c", "#f0c36a", "#ff8a5b", "#ff9aa2", "#5b8def"];
+
 function toast(msg) {
   const el = $("#toast");
   el.textContent = msg;
@@ -53,6 +55,27 @@ function applyTheme() {
   document.documentElement.dataset.theme = state.settings.theme || "dark";
   document.body.classList.toggle("compact", !!state.settings.compact);
   $("#btn-layout").textContent = state.settings.layout === "stacks" ? "Stacks" : "Rows";
+  const pick = state.settings.pickerLayout || "tiles";
+  document.querySelectorAll("#picker-layout button").forEach((b) => {
+    b.classList.toggle("active", b.dataset.pick === pick);
+  });
+  const grid = $("#picker-grid");
+  grid.classList.toggle("tiles", pick === "tiles");
+  grid.classList.toggle("rows", pick === "rows");
+  $("#combined-legend").hidden = state.settings.progressMode !== "combined";
+}
+
+function episodeTotal(show) {
+  return show.episodes || Math.max(show.subAired || 0, show.dubAired || 0, show.nextSubEpisode || 0, 12);
+}
+
+function nextEpisode(show, kind) {
+  if (kind === "dub") return (show.nextEvents || []).find((e) => e.kind === "dub")?.episode;
+  if (kind === "combined") {
+    const events = show.nextEvents || [];
+    return events[0]?.episode || show.nextSubEpisode;
+  }
+  return show.nextSubEpisode;
 }
 
 function pipClass(n, aired, watched, nextEp) {
@@ -64,30 +87,53 @@ function pipClass(n, aired, watched, nextEp) {
   return cls.join(" ");
 }
 
-function episodeTotal(show) {
-  return show.episodes || Math.max(show.subAired || 0, show.dubAired || 0, show.nextSubEpisode || 0, 12);
+function combinedPipClass(n, show) {
+  const cls = ["pip"];
+  const watched = Math.max(show.watchedSub || 0, show.watchedDub || 0);
+  const subAired = show.subAired || 0;
+  const dubAired = show.dubAired || 0;
+  if (watched >= n) cls.push("watched");
+  else if (dubAired >= n) cls.push("dub-aired");
+  else if (subAired >= n) cls.push("sub-aired");
+  else cls.push("future");
+  if (nextEpisode(show, "combined") === n) cls.push("next");
+  return cls.join(" ");
+}
+
+function makePip(n, className, title, onClick) {
+  const el = document.createElement("button");
+  el.type = "button";
+  el.className = className;
+  el.textContent = String(n);
+  el.title = title;
+  el.addEventListener("click", (ev) => {
+    ev.stopPropagation();
+    onClick();
+  });
+  return el;
 }
 
 function pips(show, kind) {
   const total = Math.min(episodeTotal(show), 26);
-  const aired = kind === "dub" ? show.dubAired || 0 : show.subAired || 0;
-  const watched = kind === "dub" ? show.watchedDub || 0 : show.watchedSub || 0;
-  const nextEp =
-    kind === "dub"
-      ? (show.nextEvents || []).find((e) => e.kind === "dub")?.episode
-      : show.nextSubEpisode;
   const wrap = document.createElement("div");
   wrap.className = "pips";
   for (let n = 1; n <= total; n += 1) {
-    const el = document.createElement("button");
-    el.className = pipClass(n, aired, watched, nextEp);
-    el.textContent = n;
-    el.title = `${kind.toUpperCase()} ep ${n}`;
-    el.addEventListener("click", (ev) => {
-      ev.stopPropagation();
-      setProgress(show, kind, n === watched ? n - 1 : n);
-    });
-    wrap.appendChild(el);
+    if (kind === "combined") {
+      wrap.appendChild(
+        makePip(n, combinedPipClass(n, show), `Ep ${n}`, () => {
+          const current = Math.max(show.watchedSub || 0, show.watchedDub || 0);
+          setProgress(show, "combined", n === current ? n - 1 : n);
+        }),
+      );
+    } else {
+      const aired = kind === "dub" ? show.dubAired || 0 : show.subAired || 0;
+      const watched = kind === "dub" ? show.watchedDub || 0 : show.watchedSub || 0;
+      wrap.appendChild(
+        makePip(n, pipClass(n, aired, watched, nextEpisode(show, kind)), `${kind.toUpperCase()} ep ${n}`, () => {
+          setProgress(show, kind, n === watched ? n - 1 : n);
+        }),
+      );
+    }
   }
   if ((show.episodes || 0) > 26) {
     const more = document.createElement("span");
@@ -99,43 +145,71 @@ function pips(show, kind) {
 }
 
 function trackRow(show, kind) {
-  const aired = kind === "dub" ? show.dubAired : show.subAired;
-  const remaining = kind === "dub" ? show.remainingDub : show.remainingSub;
-  const total = show.episodes;
   const row = document.createElement("div");
   row.className = "track";
-  row.innerHTML = `<span class="lbl">${kind.toUpperCase()}</span>`;
+  const lbl = kind === "combined" ? "EPS" : kind.toUpperCase();
+  row.innerHTML = `<span class="lbl">${lbl}</span>`;
   row.appendChild(pips(show, kind));
   const counts = document.createElement("span");
   counts.className = "counts";
-  if (aired == null && remaining == null) counts.textContent = "\u2014";
-  else counts.textContent = `${aired ?? "?"} / ${total ?? "?"} \u00b7 ${remaining == null ? "?" : remaining} left`;
+  if (kind === "combined") {
+    const subA = show.subAired;
+    const dubA = show.dubAired;
+    const total = show.episodes;
+    counts.textContent = `S ${subA ?? "?"} · D ${dubA ?? "?"} / ${total ?? "?"}`;
+  } else {
+    const aired = kind === "dub" ? show.dubAired : show.subAired;
+    const remaining = kind === "dub" ? show.remainingDub : show.remainingSub;
+    const total = show.episodes;
+    if (aired == null && remaining == null) counts.textContent = "—";
+    else counts.textContent = `${aired ?? "?"} / ${total ?? "?"} · ${remaining == null ? "?" : remaining} left`;
+  }
   row.appendChild(counts);
   return row;
 }
 
 function stackCol(show, kind) {
   const total = Math.min(episodeTotal(show), 16);
-  const aired = kind === "dub" ? show.dubAired || 0 : show.subAired || 0;
-  const watched = kind === "dub" ? show.watchedDub || 0 : show.watchedSub || 0;
-  const nextEp =
-    kind === "dub"
-      ? (show.nextEvents || []).find((e) => e.kind === "dub")?.episode
-      : show.nextSubEpisode;
+  const posterTop = state.settings.stackPoster === "top";
   const col = document.createElement("div");
   col.className = "stack-col";
-  for (let n = 1; n <= total; n += 1) {
-    const el = document.createElement("button");
-    el.className = pipClass(n, aired, watched, nextEp);
-    el.textContent = n;
-    el.addEventListener("click", () => setProgress(show, kind, n === watched ? n - 1 : n));
-    col.appendChild(el);
-  }
   const tag = document.createElement("span");
   tag.className = "tag";
-  tag.textContent = kind.toUpperCase();
-  col.appendChild(tag);
+  tag.textContent = kind === "combined" ? "EPS" : kind.toUpperCase();
+  if (posterTop) col.appendChild(tag);
+  for (let n = 1; n <= total; n += 1) {
+    if (kind === "combined") {
+      col.appendChild(
+        makePip(n, combinedPipClass(n, show), `Ep ${n}`, () => {
+          const current = Math.max(show.watchedSub || 0, show.watchedDub || 0);
+          setProgress(show, "combined", n === current ? n - 1 : n);
+        }),
+      );
+    } else {
+      const aired = kind === "dub" ? show.dubAired || 0 : show.subAired || 0;
+      const watched = kind === "dub" ? show.watchedDub || 0 : show.watchedSub || 0;
+      col.appendChild(
+        makePip(n, pipClass(n, aired, watched, nextEpisode(show, kind)), `${kind.toUpperCase()} ep ${n}`, () => {
+          setProgress(show, kind, n === watched ? n - 1 : n);
+        }),
+      );
+    }
+  }
+  if (!posterTop) col.appendChild(tag);
   return col;
+}
+
+function appendTracks(target, show, mode) {
+  if (state.settings.progressMode === "combined") {
+    target.appendChild(mode === "stack" ? stackCol(show, "combined") : trackRow(show, "combined"));
+    return;
+  }
+  if (state.settings.showSub !== false) {
+    target.appendChild(mode === "stack" ? stackCol(show, "sub") : trackRow(show, "sub"));
+  }
+  if (state.settings.showDub !== false) {
+    target.appendChild(mode === "stack" ? stackCol(show, "dub") : trackRow(show, "dub"));
+  }
 }
 
 function showMeta(show) {
@@ -143,11 +217,11 @@ function showMeta(show) {
   const foci = show.focusAll && show.focusAll.length ? show.focusAll : (show.focus ? [show.focus] : []);
   if (foci.length) {
     foci.forEach((focus) => {
-      bits.push(`<span class="chip next">${focus.kind.toUpperCase()} ${focus.episode} \u00b7 ${fmtTime(focus.at)} \u00b7 ${countdown(focus.at)}</span>`);
+      bits.push(`<span class="chip next">${focus.kind.toUpperCase()} ${focus.episode} · ${fmtTime(focus.at)} · ${countdown(focus.at)}</span>`);
     });
   } else if (show.nextEvents && show.nextEvents[0]) {
     const n = show.nextEvents[0];
-    bits.push(`<span class="chip next">${n.kind.toUpperCase()} ${n.episode} \u00b7 ${fmtTime(n.at)} \u00b7 ${countdown(n.at)}</span>`);
+    bits.push(`<span class="chip next">${n.kind.toUpperCase()} ${n.episode} · ${fmtTime(n.at)} · ${countdown(n.at)}</span>`);
   }
   if (show.score) bits.push(`<span class="chip">${(show.score / 10).toFixed(1)}</span>`);
   if (show.dubLag) bits.push(`<span class="chip warn">Dub ${show.dubLag} behind</span>`);
@@ -165,82 +239,110 @@ function renderRow(show) {
       <div class="title-line">
         <h4 title="${show.title}">${show.title}</h4>
         <div class="progress-btns">
-          <button data-act="remove">Remove</button>
+          <button type="button" data-act="remove">Remove</button>
         </div>
       </div>
       <div class="meta">${showMeta(show)}</div>
     </div>
   `;
   const body = card.querySelector(".row-body");
-  if (state.settings.showSub !== false) body.appendChild(trackRow(show, "sub"));
-  if (state.settings.showDub !== false) body.appendChild(trackRow(show, "dub"));
+  appendTracks(body, show, "row");
   card.querySelector("[data-act=remove]").addEventListener("click", () => removeShow(show.id));
   return card;
 }
 
 function renderStack(show) {
+  const posterTop = state.settings.stackPoster === "top";
   const card = document.createElement("article");
-  card.className = "stack-card";
-  const cols = document.createElement("div");
-  cols.className = "stack-cols";
-  if (state.settings.showSub !== false) cols.appendChild(stackCol(show, "sub"));
-  if (state.settings.showDub !== false) cols.appendChild(stackCol(show, "dub"));
-  card.appendChild(cols);
+  card.className = "stack-card" + (posterTop ? " poster-top" : "");
   const img = document.createElement("img");
   img.className = "poster";
   img.src = show.cover || "";
-  card.appendChild(img);
   const h = document.createElement("h4");
   h.textContent = show.title;
-  card.appendChild(h);
+  const cols = document.createElement("div");
+  cols.className = "stack-cols";
+  appendTracks(cols, show, "stack");
   const meta = document.createElement("div");
   meta.className = "meta";
-  meta.style.justifyContent = "center";
   meta.innerHTML = showMeta(show);
-  card.appendChild(meta);
+  if (posterTop) {
+    card.appendChild(img);
+    card.appendChild(h);
+    card.appendChild(cols);
+    card.appendChild(meta);
+  } else {
+    card.appendChild(cols);
+    card.appendChild(img);
+    card.appendChild(h);
+    card.appendChild(meta);
+  }
   return card;
+}
+
+function isWeekRange(range) {
+  return range === "this_week" || range === "next_week" || range === "week_after";
+}
+
+function paintCard(show) {
+  return (state.settings.layout || "rows") === "stacks" ? renderStack(show) : renderRow(show);
+}
+
+function cardsClass() {
+  const layout = state.settings.layout || "rows";
+  const poster = state.settings.stackPoster === "top" ? " poster-top" : "";
+  return `cards ${layout}${layout === "stacks" ? poster : ""}`;
+}
+
+function renderDaySection(label, shows, { column, accent } = {}) {
+  const wrap = document.createElement("section");
+  wrap.className = column ? "day-col" : "day-block";
+  if (accent) wrap.style.setProperty("--day-accent", accent);
+  wrap.innerHTML = `<h3>${label}</h3>`;
+  const cards = document.createElement("div");
+  cards.className = cardsClass();
+  shows.forEach((s) => cards.appendChild(paintCard(s)));
+  wrap.appendChild(cards);
+  return wrap;
 }
 
 function renderBoard() {
   board.innerHTML = "";
   const layout = state.settings.layout || "rows";
+
   if (state.range === "library") {
-    const wrap = document.createElement("section");
-    wrap.className = "day-block";
-    wrap.innerHTML = `<h3>Pinned shows \u00b7 ${state.library.length}</h3>`;
-    const cards = document.createElement("div");
-    cards.className = "cards " + layout;
     if (!state.library.length) {
-      wrap.innerHTML += `<div class="empty">Nothing pinned yet. Click <b>Add shows</b> and pick this season\u2019s titles.</div>`;
-      board.appendChild(wrap);
+      board.innerHTML = `<div class="empty">Nothing pinned yet. Click <b>Add shows</b> and pick this season’s titles.</div>`;
       return;
     }
-    state.library.forEach((s) => cards.appendChild(layout === "stacks" ? renderStack(s) : renderRow(s)));
-    wrap.appendChild(cards);
-    board.appendChild(wrap);
+    board.appendChild(renderDaySection(`Pinned shows · ${state.library.length}`, state.library));
     return;
   }
 
   const days = state.schedule?.days || [];
-  $("#range-label").textContent = `${state.schedule?.label || ""} \u00b7 ${state.schedule?.count || 0} airings`;
+  $("#range-label").textContent = `${state.schedule?.label || ""} · ${state.schedule?.count || 0} airings`;
   if (!days.length) {
     board.innerHTML = `<div class="empty">None of your pinned shows air in this window. Add more from the season list, or switch to <b>My shows</b>.</div>`;
     return;
   }
-  days.forEach((day) => {
-    const wrap = document.createElement("section");
-    wrap.className = "day-block";
-    wrap.innerHTML = `<h3>${day.label}</h3>`;
-    const cards = document.createElement("div");
-    cards.className = "cards " + layout;
-    day.shows.forEach((s) => cards.appendChild(layout === "stacks" ? renderStack(s) : renderRow(s)));
-    wrap.appendChild(cards);
-    board.appendChild(wrap);
+
+  if (isWeekRange(state.range) || layout === "stacks") {
+    const strip = document.createElement("div");
+    strip.className = "week-strip";
+    days.forEach((day, i) => {
+      strip.appendChild(renderDaySection(day.label, day.shows, { column: true, accent: DAY_ACCENTS[i % DAY_ACCENTS.length] }));
+    });
+    board.appendChild(strip);
+    return;
+  }
+
+  days.forEach((day, i) => {
+    board.appendChild(renderDaySection(day.label, day.shows, { accent: DAY_ACCENTS[i % DAY_ACCENTS.length] }));
   });
 }
 
 async function loadSchedule() {
-  $("#range-label").textContent = "Refreshing\u2026";
+  $("#range-label").textContent = "Refreshing…";
   if (state.range === "library") {
     const data = await api("/api/library");
     state.library = data.shows;
@@ -259,24 +361,35 @@ async function loadSchedule() {
 
 async function setProgress(show, kind, value) {
   const body = { id: show.id };
-  if (kind === "dub") body.watchedDub = value;
+  if (kind === "combined") {
+    body.watchedSub = value;
+    body.watchedDub = value;
+  } else if (kind === "dub") body.watchedDub = value;
   else body.watchedSub = value;
   const data = await api("/api/library/progress", { method: "POST", body: JSON.stringify(body) });
   state.library = data.shows;
   await loadSchedule();
 }
 
+function markPickerItem(id, inLibrary) {
+  document.querySelectorAll("#picker-grid .pick").forEach((el) => {
+    if (Number(el.dataset.id) === Number(id)) {
+      el.classList.toggle("in", inLibrary);
+    }
+  });
+}
+
 async function removeShow(id) {
   await api("/api/library/remove", { method: "POST", body: JSON.stringify({ id }) });
   toast("Removed from widget");
-  await loadPicker();
+  markPickerItem(id, false);
   await loadSchedule();
 }
 
 async function addShow(item) {
   await api("/api/library/add", { method: "POST", body: JSON.stringify(item) });
   toast(`Pinned ${item.title}`);
-  await loadPicker();
+  markPickerItem(item.id, true);
   await loadSchedule();
 }
 
@@ -294,9 +407,29 @@ function fillSeasonSelect() {
   sel.value = `${state.pickerSeason}-${state.pickerYear}`;
 }
 
+function renderPick(m) {
+  const layout = state.settings.pickerLayout || "tiles";
+  const el = document.createElement("button");
+  el.type = "button";
+  el.className = "pick" + (layout === "rows" ? " pick-row" : "") + (m.inLibrary ? " in" : "");
+  el.dataset.id = m.id;
+  const meta = [m.format, m.episodes ? `${m.episodes} ep` : null, m.seasonYear].filter(Boolean).join(" · ");
+  if (layout === "rows") {
+    el.innerHTML = `<img src="${m.cover || ""}" alt="" /><span>${m.title}<small>${meta}</small></span>`;
+  } else {
+    el.innerHTML = `<img src="${m.cover || ""}" alt="" /><span>${m.title}</span>`;
+  }
+  el.addEventListener("click", () => {
+    if (el.classList.contains("in")) removeShow(m.id);
+    else addShow(m);
+  });
+  return el;
+}
+
 async function loadPicker(query) {
   const grid = $("#picker-grid");
-  grid.innerHTML = "<p class='hint'>Loading titles\u2026</p>";
+  const scrollTop = grid.scrollTop;
+  grid.innerHTML = "<p class='hint'>Loading titles…</p>";
   try {
     let media;
     if (query) {
@@ -306,26 +439,71 @@ async function loadPicker(query) {
       const data = await api(`/api/season?season=${state.pickerSeason}&year=${state.pickerYear}&page=${state.pickerPage}`);
       media = data.media;
       const p = data.pageInfo || {};
-      $("#page-info").textContent = `${state.pickerSeason} ${state.pickerYear} \u00b7 page ${p.currentPage || state.pickerPage}`;
+      $("#page-info").textContent = `${state.pickerSeason} ${state.pickerYear} · page ${p.currentPage || state.pickerPage}`;
     }
     grid.innerHTML = "";
-    media.forEach((m) => {
-      const el = document.createElement("button");
-      el.className = "pick" + (m.inLibrary ? " in" : "");
-      el.innerHTML = `<img src="${m.cover || ""}" alt="" /><span>${m.title}</span>`;
-      el.addEventListener("click", () => {
-        if (m.inLibrary) removeShow(m.id);
-        else addShow(m);
-      });
-      grid.appendChild(el);
-    });
+    media.forEach((m) => grid.appendChild(renderPick(m)));
     if (!media.length) grid.innerHTML = "<p class='hint'>No titles on this page.</p>";
+    grid.scrollTop = scrollTop;
   } catch (err) {
     grid.innerHTML = `<p class="hint">Could not load catalog: ${err.message}</p>`;
   }
 }
 
+function closeSelects(except) {
+  document.querySelectorAll(".select.open").forEach((el) => {
+    if (el !== except) el.classList.remove("open");
+  });
+}
+
+function setSelectValue(root, value) {
+  const hidden = root.querySelector("input[type=hidden]");
+  const btn = root.querySelector(".select-btn");
+  const items = [...root.querySelectorAll("li")];
+  const match = items.find((li) => li.dataset.value === value) || items[0];
+  hidden.value = match.dataset.value;
+  btn.textContent = match.textContent;
+  items.forEach((li) => li.classList.toggle("active", li === match));
+}
+
+function wireSelects() {
+  document.querySelectorAll(".select").forEach((root) => {
+    const btn = root.querySelector(".select-btn");
+    btn.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const willOpen = !root.classList.contains("open");
+      closeSelects();
+      root.classList.toggle("open", willOpen);
+    });
+    root.querySelectorAll("li").forEach((li) => {
+      li.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        setSelectValue(root, li.dataset.value);
+        root.classList.remove("open");
+      });
+    });
+  });
+  document.addEventListener("click", () => closeSelects());
+}
+
+function fillSettingsForm() {
+  const form = $("#settings-form");
+  const s = state.settings;
+  setSelectValue(form.querySelector('[data-name="layout"]'), s.layout || "rows");
+  setSelectValue(form.querySelector('[data-name="stackPoster"]'), s.stackPoster || "bottom");
+  setSelectValue(form.querySelector('[data-name="theme"]'), s.theme || "dark");
+  setSelectValue(form.querySelector('[data-name="titleLanguage"]'), s.titleLanguage || "english");
+  setSelectValue(form.querySelector('[data-name="progressMode"]'), s.progressMode || "split");
+  setSelectValue(form.querySelector('[data-name="weekStart"]'), s.weekStart || "sunday");
+  form.showSub.checked = s.showSub !== false;
+  form.showDub.checked = s.showDub !== false;
+  form.compact.checked = !!s.compact;
+  $("#combined-legend").hidden = (s.progressMode || "split") !== "combined";
+}
+
 function wire() {
+  wireSelects();
   document.querySelectorAll("#ranges button").forEach((btn) => {
     btn.addEventListener("click", () => {
       document.querySelectorAll("#ranges button").forEach((b) => b.classList.remove("active"));
@@ -346,14 +524,7 @@ function wire() {
   });
   $("#drawer-close").addEventListener("click", () => $("#drawer").classList.add("hidden"));
   $("#btn-settings").addEventListener("click", () => {
-    const form = $("#settings-form");
-    form.layout.value = state.settings.layout;
-    form.theme.value = state.settings.theme;
-    form.titleLanguage.value = state.settings.titleLanguage;
-    form.weekStart.value = state.settings.weekStart;
-    form.showSub.checked = state.settings.showSub !== false;
-    form.showDub.checked = state.settings.showDub !== false;
-    form.compact.checked = !!state.settings.compact;
+    fillSettingsForm();
     $("#settings").classList.remove("hidden");
   });
   $("#settings-close").addEventListener("click", () => $("#settings").classList.add("hidden"));
@@ -362,8 +533,10 @@ function wire() {
     const form = ev.target;
     const payload = {
       layout: form.layout.value,
+      stackPoster: form.stackPoster.value,
       theme: form.theme.value,
       titleLanguage: form.titleLanguage.value,
+      progressMode: form.progressMode.value,
       weekStart: form.weekStart.value,
       showSub: form.showSub.checked,
       showDub: form.showDub.checked,
@@ -374,6 +547,15 @@ function wire() {
     $("#settings").classList.add("hidden");
     toast("Settings saved");
     loadSchedule();
+  });
+  document.querySelectorAll("#picker-layout button").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const pick = btn.dataset.pick;
+      state.settings = await api("/api/settings", { method: "POST", body: JSON.stringify({ pickerLayout: pick }) });
+      applyTheme();
+      const q = $("#search").value.trim();
+      loadPicker(q.length >= 2 ? q : null);
+    });
   });
   $("#season-select").addEventListener("change", (ev) => {
     const [s, y] = ev.target.value.split("-");
