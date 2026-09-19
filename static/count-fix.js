@@ -65,11 +65,10 @@
     const total = show.episodes || 12;
     const sub = airedNow(show, 'sub');
     const dub = airedNow(show, 'dub');
-    const hasDub = (show.dubAired || 0) > 0 || !!show.hasDubSchedule ||
-      (show.nextEvents || []).some(function (e) { return e.kind === 'dub'; });
+    const dubTile = card.querySelector('.remain-tile.dub');
     card.classList.remove('finished', 'sub-done');
-    if (hasDub && sub >= total && dub < total) card.classList.add('sub-done');
-    else if (sub >= total && (!hasDub || dub >= total)) card.classList.add('finished');
+    if (sub >= Number(total) && dubTile && dub < Number(total)) card.classList.add('sub-done');
+    else if (sub >= Number(total)) card.classList.add('finished');
     card.querySelectorAll('.remain-tile').forEach(function (el) {
       const kind = el.classList.contains('dub') ? 'dub' : 'sub';
       const aired = kind === 'dub' ? dub : sub;
