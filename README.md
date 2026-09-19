@@ -25,7 +25,9 @@ That starts the backend at login and, on KDE, installs the desktop widget.
 If the widget does not appear:
 
 ```bash
-kquitapp6 plasmashell && kstart6 plasmashell
+kquitapp6 plasmashell
+kstart plasmashell
+# or: systemctl --user restart plasma-plasmashell.service
 sudo dnf install -y qt6-qtwebengine
 ```
 
@@ -42,10 +44,9 @@ Resize that window like any other app. Pin it to a workspace or set it always-on
 1. **Add shows** — pick the current season or search
 2. Switch **Today / This week / Next week / Following / My shows**
 3. **Rows / Stacks** — two layouts for remaining episodes
-4. **Compact** — poster + remaining-count tiles only (next to Rows/Stacks)
+4. **Compact** — poster + remaining-count tiles only
 5. Click an episode square to mark it watched
-6. **▣** (top right) — hide the chrome (minimal mode)
-7. **⚙ Settings** — theme, sub/dub tracks, **Reload UI** / **Reload widget** after a `git pull`
+6. Bottom bar — ranges on the left, compact / layout / minimal / float / settings on the right
 
 Finished series get a green card border.
 
