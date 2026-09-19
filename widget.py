@@ -21,6 +21,7 @@ from tracker_lib import (
     LIBRARY_PATH,
     STATIC,
     build_maps,
+    rolling_week_bounds,
     compact_media,
     enrich_show,
     event_in_range,
@@ -218,7 +219,7 @@ class Handler(SimpleHTTPRequestHandler):
             start, end = today_bounds()
             label = start.strftime("%A %-d %b")
         elif range_key == "this_week":
-            start, end = week_bounds(0, settings.get("weekStart", "sunday"))
+            start, end = rolling_week_bounds(settings.get("weekStart", "sunday"))
             label = f"{start.strftime('%-d %b')} – {(end - timedelta(days=1)).strftime('%-d %b')}"
         elif range_key == "next_week":
             start, end = week_bounds(1, settings.get("weekStart", "sunday"))

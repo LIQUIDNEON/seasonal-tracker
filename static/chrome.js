@@ -123,16 +123,23 @@
     return null;
   }
   function weekBuckets() {
-    const wantSun = (state.settings.weekStart || 'sunday') !== 'monday';
     const now = new Date();
+    const wantSun = (state.settings.weekStart || 'sunday') !== 'monday';
     const startWeekday = wantSun ? 0 : 1;
     const daysSince = (now.getDay() - startWeekday + 7) % 7;
-    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysSince);
+    const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysSince);
+    const weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6);
     const extra = state.range === 'next_week' ? 7 : state.range === 'week_after' ? 14 : 0;
-    start.setDate(start.getDate() + extra);
+    const start = state.range === 'this_week'
+      ? new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      : new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + extra);
+    const end = state.range === 'this_week'
+      ? new Date(weekEnd.getFullYear(), weekEnd.getMonth(), weekEnd.getDate())
+      : new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6);
     const buckets = {};
     for (let i = 0; i < 7; i += 1) {
       const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+      if (state.range === 'this_week' && d > end) break;
       buckets[localKey(d)] = { date: localKey(d), label: d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' }), shows: [] };
     }
     return buckets;

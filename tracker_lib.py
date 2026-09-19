@@ -66,13 +66,33 @@ def next_season(season: str, year: int) -> tuple[str, int]:
     return SEASONS[i + 1], year
 
 
+def week_start_for_date(day: datetime, week_start: str = "sunday") -> datetime:
+    start_weekday = 6 if week_start == "sunday" else 0
+    days_since = (day.weekday() - start_weekday) % 7
+    return (day - timedelta(days=days_since)).replace(hour=0, minute=0, second=0, microsecond=0)
+
+
 def week_bounds(offset: int, week_start: str = "sunday") -> tuple[datetime, datetime]:
     local = datetime.now().astimezone()
-    start_weekday = 6 if week_start == "sunday" else 0
-    days_since = (local.weekday() - start_weekday) % 7
-    start = (local - timedelta(days=days_since)).replace(hour=0, minute=0, second=0, microsecond=0)
-    start = start + timedelta(days=7 * offset)
+    start = week_start_for_date(local, week_start) + timedelta(days=7 * offset)
     return start, start + timedelta(days=7)
+
+
+def rolling_week_bounds(week_start: str = "sunday", now: datetime | None = None) -> tuple[datetime, datetime]:
+    local = (now or datetime.now().astimezone()).astimezone()
+    today = local.replace(hour=0, minute=0, second=0, microsecond=0)
+    week_origin = week_start_for_date(today, week_start)
+    week_end = (week_origin + timedelta(days=6)).replace(hour=0, minute=0, second=0, microsecond=0)
+    window_end = max(today, week_end) + timedelta(days=1)
+    return today, window_end
+
+
+def jst_weekday(value: Any) -> int | None:
+    dt = parse_airing(value)
+    if dt is None:
+        return None
+    tokyo = dt.astimezone(timezone(timedelta(hours=9)))
+    return (tokyo.weekday() + 1) % 7
 
 
 def today_bounds() -> tuple[datetime, datetime]:

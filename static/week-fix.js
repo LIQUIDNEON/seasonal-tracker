@@ -20,15 +20,27 @@
     return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
   }
 
-  // Sunday (or Monday) that begins the calendar week `off` weeks from now.
+  // Calendar week origin for the configured week start, used for the full-week
+  // ranges (next week / following). This week is a rolling slice anchored on the
+  // current local day and clipped to the end of the configured week.
   function weekOrigin(off) {
     var wantSun = (state.settings.weekStart || 'sunday') !== 'monday';
     var now = new Date();
+    var target = new Date(now.getFullYear(), now.getMonth(), now.getDate() + (Number(off) || 0) * 7);
     var startWeekday = wantSun ? 0 : 1;
-    var daysSince = (now.getDay() - startWeekday + 7) % 7;
-    var start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysSince);
-    start.setDate(start.getDate() + (Number(off) || 0) * 7);
+    var daysSince = (target.getDay() - startWeekday + 7) % 7;
+    var start = new Date(target.getFullYear(), target.getMonth(), target.getDate() - daysSince);
     return start;
+  }
+
+  function thisWeekBounds() {
+    var today = new Date();
+    var wantSun = (state.settings.weekStart || 'sunday') !== 'monday';
+    var startWeekday = wantSun ? 0 : 1;
+    var daysSince = (today.getDay() - startWeekday + 7) % 7;
+    var weekStart = new Date(today.getFullYear(), today.getMonth(), today.getDate() - daysSince);
+    var end = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6);
+    return { start: new Date(today.getFullYear(), today.getMonth(), today.getDate()), end: end };
   }
 
   function fmtLane(d) {
@@ -36,8 +48,16 @@
   }
 
   function fmtRange(off) {
-    var s = weekOrigin(off);
-    var e = new Date(s.getFullYear(), s.getMonth(), s.getDate() + 6);
+    var s;
+    var e;
+    if (off === 0 && state.range === 'this_week') {
+      var bounds = thisWeekBounds();
+      s = bounds.start;
+      e = bounds.end;
+    } else {
+      s = weekOrigin(off);
+      e = new Date(s.getFullYear(), s.getMonth(), s.getDate() + 6);
+    }
     function bit(d) {
       return d.getDate() + ' ' + d.toLocaleDateString(undefined, { month: 'short' });
     }
@@ -111,11 +131,22 @@
     var cardsClass = sampleCards ? sampleCards.className : 'cards';
     while (strip.firstChild) strip.removeChild(strip.firstChild);
 
-    // Exactly seven lanes, calendar order from the week origin.
+    var laneStart = origin;
+    var laneEnd = new Date(origin.getFullYear(), origin.getMonth(), origin.getDate() + 6);
+    if (off === 0 && state.range === 'this_week') {
+      var rolling = thisWeekBounds();
+      laneStart = rolling.start;
+      laneEnd = rolling.end;
+    }
+
+    // Exactly seven lanes, ordered from the current local day through the end of
+    // the configured week. For "This week" we never backfill stale dates from the
+    // earlier calendar week.
     var lanes = [];
     var i;
     for (i = 0; i < 7; i += 1) {
-      var day = new Date(origin.getFullYear(), origin.getMonth(), origin.getDate() + i);
+      var day = new Date(laneStart.getFullYear(), laneStart.getMonth(), laneStart.getDate() + i);
+      if (off === 0 && state.range === 'this_week' && day > laneEnd) break;
       var col = document.createElement('section');
       col.className = 'day-col';
       col.dataset.date = localKey(day);
