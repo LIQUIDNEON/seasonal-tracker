@@ -4,8 +4,25 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Seasonal Tracker</title>
-  <link rel="stylesheet" href="/style.css" />
-  <link rel="stylesheet" href="/compact.css" />
+  <link rel="stylesheet" href="/style.css?v=bar2" />
+  <link rel="stylesheet" href="/compact.css?v=bar2" />
+  <style>
+    .statusbar {
+      display: flex !important;
+      flex-direction: row !important;
+      flex-wrap: nowrap !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      height: 32px !important;
+      max-height: 32px !important;
+      overflow: hidden !important;
+    }
+    .statusbar .ranges { margin-right: auto !important; flex-wrap: nowrap !important; }
+    .statusbar .tools { margin-left: auto !important; flex-wrap: nowrap !important; }
+    #range-label, #season-chip, .bar-label, .season-chip, .statusline, #btn-minimal {
+      display: none !important;
+    }
+  </style>
 </head>
 <body>
   <div id="app">
@@ -18,8 +35,6 @@
         <button type="button" data-range="week_after">Following</button>
         <button type="button" data-range="library">My shows</button>
       </nav>
-      <span id="range-label" class="bar-label">Loading…</span>
-      <span id="season-chip" class="season-chip">—</span>
       <div class="tools">
         <button type="button" id="btn-compact" class="icon-btn" title="Compact" aria-label="Compact">▣</button>
         <button type="button" id="btn-layout" class="icon-btn" title="Rows / Stacks" aria-label="Layout">
@@ -35,8 +50,7 @@
             <rect x="14" y="4" width="5" height="15" rx="1.2"/>
           </svg>
         </button>
-        <button type="button" id="btn-minimal" class="icon-btn" title="Minimal — hide chrome" aria-label="Minimal">▁</button>
-        <button type="button" id="btn-float" class="icon-btn" title="Float — free window you can drag and resize" aria-label="Float">⧉</button>
+        <button type="button" id="btn-float" class="icon-btn" title="Float" aria-label="Float">⧉</button>
         <button type="button" id="btn-settings" class="icon-btn" title="Settings" aria-label="Settings">⚙</button>
       </div>
     </footer>
@@ -54,7 +68,6 @@
         <button type="button" data-pick="rows">Rows</button>
       </div>
     </div>
-    <p class="hint">Hover a title for the synopsis. Click to pin.</p>
     <div id="picker-grid" class="picker-grid tiles"></div>
     <div class="pager">
       <button type="button" id="page-prev">Prev</button>
@@ -145,6 +158,10 @@
       </div>
     </form>
   </aside>
+  <div hidden>
+    <span id="range-label"></span>
+    <span id="season-chip"></span>
+  </div>
   <div id="toast" class="toast hidden"></div>
   <div id="hover-tip" class="hover-tip hidden"></div>
   <script src="/app.js"></script>
