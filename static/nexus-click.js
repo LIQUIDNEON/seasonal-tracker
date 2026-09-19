@@ -1,18 +1,57 @@
 (function () {
+  const STORE = 'st-nexus-urls';
+  const HOLD_MS = 4000;
+
   const css = document.createElement('style');
   css.textContent = [
-    'a.show-title,.stack-card.compact a{',
-    'color:inherit!important;text-decoration:none!important;',
-    'font-size:12px!important;font-weight:650!important;',
-    'display:-webkit-box!important;-webkit-line-clamp:2!important;',
-    '-webkit-box-orient:vertical!important;overflow:hidden!important;',
-    'height:2.6em!important;line-height:1.3!important;cursor:pointer!important;',
-    '}',
-    'a.show-title:hover,a.show-title:visited,.stack-card.compact a:hover{',
-    'color:inherit!important;text-decoration:none!important;',
+    'h4.nexus-editing,input.nexus-input{',
+    'box-sizing:border-box!important;width:100%!important;',
+    'height:2.6em!important;font-size:11px!important;font-weight:600!important;',
+    'border-radius:6px!important;border:1px solid var(--line,#2a3340)!important;',
+    'background:var(--card-2,#1c2430)!important;color:var(--text,#e8eef6)!important;',
+    'padding:2px 6px!important;margin:4px 0 0!important;',
     '}'
   ].join('');
   document.head.appendChild(css);
+
+  function loadMap() {
+    try { return JSON.parse(localStorage.getItem(STORE) || '{}'); }
+    catch (e) { return {}; }
+  }
+  function saveMap(map) {
+    localStorage.setItem(STORE, JSON.stringify(map));
+  }
+  function nexusFor(show) {
+    const map = loadMap();
+    return show.nexusUrl || map[String(show.id)] || '';
+  }
+  function searchUrl(title) {
+    return 'https://anime.nexus/series?search=' + encodeURIComponent(title || '');
+  }
+  function isSeriesUrl(url) {
+    return /^https?:\/\/anime\.nexus\/series\/[0-9a-f-]{36}\//i.test(url || '');
+  }
+  function persist(show, url) {
+    const map = loadMap();
+    if (url) map[String(show.id)] = url;
+    else delete map[String(show.id)];
+    saveMap(map);
+    show.nexusUrl = url || undefined;
+    fetch('/api/library/progress', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: show.id, nexusUrl: url || '' })
+    }).catch(function () {});
+  }
+  function openNexus(url) {
+    fetch('/api/open', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: url })
+    }).catch(function () {
+      fetch('/api/open?url=' + encodeURIComponent(url)).catch(function () {});
+    });
+  }
 
   function fmtWhen(at) {
     if (typeof fmtTime === 'function') return fmtTime(at);
@@ -71,16 +110,69 @@
     const tip = document.querySelector('#hover-tip');
     if (tip) tip.classList.add('hidden');
   }
-  function openNexus(title) {
-    const url = 'https://anime.nexus/series?search=' + encodeURIComponent(title || '');
-    fetch('/api/open', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: url })
-    }).catch(function () {
-      fetch('/api/open?url=' + encodeURIComponent(url)).catch(function () {});
+
+  function restoreTitle(input, show) {
+    if (!input.parentNode) return;
+    const h = document.createElement('h4');
+    h.textContent = show.title;
+    h.title = titleText(show);
+    h.style.cursor = 'pointer';
+    input.replaceWith(h);
+    wireTitle(h, show);
+  }
+
+  function showInput(titleEl, show, opened) {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'nexus-input';
+    input.value = opened;
+    input.spellcheck = false;
+    titleEl.replaceWith(input);
+    input.focus();
+    input.select();
+    let timer = setTimeout(function () { restoreTitle(input, show); }, HOLD_MS);
+    function bump() {
+      clearTimeout(timer);
+      timer = setTimeout(function () { restoreTitle(input, show); }, HOLD_MS);
+    }
+    input.addEventListener('input', bump);
+    input.addEventListener('paste', function () {
+      setTimeout(function () {
+        const url = input.value.trim();
+        if (isSeriesUrl(url)) persist(show, url);
+        bump();
+      }, 0);
+    });
+    input.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter') {
+        ev.preventDefault();
+        const url = input.value.trim();
+        if (isSeriesUrl(url)) persist(show, url);
+        restoreTitle(input, show);
+      }
+      if (ev.key === 'Escape') restoreTitle(input, show);
+    });
+    input.addEventListener('blur', function () {
+      const url = input.value.trim();
+      if (isSeriesUrl(url)) persist(show, url);
+      setTimeout(function () { restoreTitle(input, show); }, 400);
     });
   }
+
+  function wireTitle(title, show) {
+    title.addEventListener('mouseenter', function () { placeTip(titleHtml(show), title); });
+    title.addEventListener('mouseleave', hideTip);
+    title.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      hideTip();
+      const saved = nexusFor(show);
+      const opened = saved || searchUrl(show.title);
+      openNexus(opened);
+      showInput(title, show, saved || '');
+    });
+  }
+
   const orig = window.paintCard;
   if (typeof orig !== 'function') return;
   window.paintCard = function (show) {
@@ -95,13 +187,7 @@
     }
     title.title = titleText(show);
     title.style.cursor = 'pointer';
-    title.addEventListener('mouseenter', function () { placeTip(titleHtml(show), title); });
-    title.addEventListener('mouseleave', hideTip);
-    title.addEventListener('click', function (ev) {
-      ev.preventDefault();
-      ev.stopPropagation();
-      openNexus(show.title);
-    });
+    wireTitle(title, show);
     return card;
   };
 })();
