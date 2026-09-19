@@ -1,17 +1,13 @@
 {
     "KPackageStructure": "Plasma/Applet",
     "KPlugin": {
-        "Authors": [
-            {
-                "Name": "LIQUIDNEON"
-            }
-        ],
+        "Authors": [{ "Name": "LIQUIDNEON" }],
         "Category": "Online Services",
         "Description": "Seasonal anime schedule and remaining-episode tracker",
         "Icon": "video-x-generic",
         "Id": "com.liquidneon.seasonaltracker",
         "License": "MIT",
-        "Name": "Seasonal Tracker",
+        "Name": "Anime Seasonal Tracker",
         "Version": "0.2.0",
         "Website": "https://github.com/LIQUIDNEON/seasonal-tracker"
     },
