@@ -10,13 +10,7 @@
 <body>
   <div id="app">
     <header class="topbar">
-      <div class="brand">
-        <span class="mark">ST</span>
-        <div>
-          <strong>Seasonal Tracker</strong>
-          <small id="season-chip">—</small>
-        </div>
-      </div>
+      <small id="season-chip" class="season-chip">—</small>
       <nav class="ranges" id="ranges">
         <button type="button" data-range="today" class="active">Today</button>
         <button type="button" data-range="this_week">This week</button>
@@ -25,11 +19,14 @@
         <button type="button" data-range="library">My shows</button>
       </nav>
       <div class="tools">
-        <button type="button" id="btn-layout" title="Switch layout">Rows</button>
-        <button type="button" id="btn-compact" title="Compact cards — poster + remaining counts">Compact</button>
-        <button type="button" id="btn-poster" class="stack-only" title="Flip stack poster">Poster bottom</button>
-        <button type="button" id="btn-add" class="primary">Add shows</button>
-        <button type="button" id="btn-settings" title="Settings">⚙</button>
+        <button type="button" id="btn-layout" class="icon-btn" title="Rows / Stacks" aria-label="Layout">
+          <svg class="i-rows" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><rect x="1" y="2" width="14" height="3" rx="1"/><rect x="1" y="6.5" width="14" height="3" rx="1"/><rect x="1" y="11" width="14" height="3" rx="1"/></svg>
+          <svg class="i-stacks" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><rect x="1" y="1" width="4" height="14" rx="1"/><rect x="6" y="1" width="4" height="14" rx="1"/><rect x="11" y="1" width="4" height="14" rx="1"/></svg>
+        </button>
+        <button type="button" id="btn-poster" class="icon-btn stack-only" title="Poster on bottom" aria-label="Poster position">
+          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 2v12M4 6l4-4 4 4M4 10l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button type="button" id="btn-settings" class="icon-btn" title="Settings" aria-label="Settings">⚙</button>
       </div>
     </header>
     <section class="statusline">
@@ -38,7 +35,8 @@
     </section>
     <main id="board" class="board"></main>
   </div>
-  <button type="button" id="btn-minimal" class="fab" title="Minimal mode — hide chrome and scrollbars">▣</button>
+  <button type="button" id="btn-compact" class="fab fab-compact" title="Compact mode">▣</button>
+  <button type="button" id="btn-minimal" class="fab fab-minimal" title="Minimal mode — hide chrome and borders">▁</button>
   <aside id="drawer" class="drawer drawer-picker hidden">
     <div class="drawer-head">
       <h2>Add seasonal shows</h2>
@@ -52,7 +50,7 @@
         <button type="button" data-pick="rows">Rows</button>
       </div>
     </div>
-    <p class="hint">Source: AniList (includes MAL ids). Dubs come from AnimeSchedule. Click a title to pin it.</p>
+    <p class="hint">Hover a title for the synopsis. Click to pin.</p>
     <div id="picker-grid" class="picker-grid tiles"></div>
     <div class="pager">
       <button type="button" id="page-prev">Prev</button>
@@ -66,6 +64,7 @@
       <button type="button" id="settings-close">Close</button>
     </div>
     <form id="settings-form" class="settings-form">
+      <button type="button" id="btn-add" class="primary">Add shows</button>
       <label>Layout
         <div class="select" data-name="layout">
           <button type="button" class="select-btn"></button>
@@ -141,9 +140,9 @@
         <button type="button" id="btn-reload-widget" class="primary">Reload widget</button>
       </div>
     </form>
-    <p class="hint">Reload UI picks up HTML/CSS/JS. Reload widget also restarts the Python backend. Library data in ~/.config is left alone.</p>
   </aside>
   <div id="toast" class="toast hidden"></div>
+  <div id="hover-tip" class="hover-tip hidden"></div>
   <script src="/app.js"></script>
   <script src="/chrome.js"></script>
 </body>
