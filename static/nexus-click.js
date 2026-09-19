@@ -1,6 +1,6 @@
 (function () {
   const STORE = 'st-nexus-urls';
-  const HOLD_MS = 4000;
+  const HOLD_MS = 8000;
 
   const css = document.createElement('style');
   css.textContent = [
