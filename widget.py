@@ -21,7 +21,6 @@ from tracker_lib import (
     LIBRARY_PATH,
     STATIC,
     build_maps,
-    rolling_week_bounds,
     compact_media,
     enrich_show,
     event_in_range,
@@ -34,10 +33,10 @@ from tracker_lib import (
     pick_title,
     save_json,
     save_library,
+    schedule_window,
     season_of,
     SETTINGS_PATH,
     today_bounds,
-    week_bounds,
 )
 
 class Handler(SimpleHTTPRequestHandler):
@@ -116,7 +115,8 @@ class Handler(SimpleHTTPRequestHandler):
                 self._send(200, {"media": media})
                 return
             if path == "/api/schedule":
-                self._send(200, self._schedule_payload((q.get("range") or ["today"])[0]))
+                offset = int((q.get("offset") or ["0"])[0] or 0)
+                self._send(200, self._schedule_payload((q.get("range") or ["today"])[0], offset=offset))
                 return
             if path.startswith("/api/show/"):
                 mid = int(path.rsplit("/", 1)[-1])
@@ -213,20 +213,14 @@ class Handler(SimpleHTTPRequestHandler):
         enriched.sort(key=lambda s: (s.get("nextEvents") or [{"ts": 10**12}])[0]["ts"])
         return {"shows": enriched}
 
-    def _schedule_payload(self, range_key: str) -> dict:
+    def _schedule_payload(self, range_key: str, offset: int = 0) -> dict:
         settings = load_settings()
+        week_start = settings.get("weekStart", "sunday")
         if range_key == "today":
             start, end = today_bounds()
             label = start.strftime("%A %-d %b")
-        elif range_key == "this_week":
-            start, end = rolling_week_bounds(settings.get("weekStart", "sunday"))
-            label = f"{start.strftime('%-d %b')} – {(end - timedelta(days=1)).strftime('%-d %b')}"
-        elif range_key == "next_week":
-            start, end = week_bounds(1, settings.get("weekStart", "sunday"))
-            label = f"{start.strftime('%-d %b')} – {(end - timedelta(days=1)).strftime('%-d %b')}"
-        elif range_key == "week_after":
-            start, end = week_bounds(2, settings.get("weekStart", "sunday"))
-            label = f"{start.strftime('%-d %b')} – {(end - timedelta(days=1)).strftime('%-d %b')}"
+        elif range_key in {"this_week", "next_week", "week_after"}:
+            start, end, label = schedule_window(range_key, week_start, offset=offset)
         else:
             start, end = today_bounds()
             label = "Today"

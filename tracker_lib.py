@@ -78,6 +78,24 @@ def week_bounds(offset: int, week_start: str = "sunday") -> tuple[datetime, date
     return start, start + timedelta(days=7)
 
 
+def schedule_window(range_key: str, week_start: str = "sunday", offset: int = 0, now: datetime | None = None) -> tuple[datetime, datetime, str]:
+    local = (now or datetime.now().astimezone()).astimezone()
+    if range_key == "today":
+        start = local.replace(hour=0, minute=0, second=0, microsecond=0)
+        return start, start + timedelta(days=1), start.strftime("%A %-d %b")
+
+    base_start, _ = rolling_week_bounds(week_start, local)
+    delta = offset
+    if range_key == "next_week":
+        delta += 1
+    elif range_key == "week_after":
+        delta += 2
+    start = base_start + timedelta(days=7 * delta)
+    end = start + timedelta(days=7)
+    label = f"{start.strftime('%-d %b')} – {(end - timedelta(days=1)).strftime('%-d %b')}"
+    return start, end, label
+
+
 def rolling_week_bounds(week_start: str = "sunday", now: datetime | None = None) -> tuple[datetime, datetime]:
     local = (now or datetime.now().astimezone()).astimezone()
     today = local.replace(hour=0, minute=0, second=0, microsecond=0)
