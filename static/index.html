@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Seasonal Tracker</title>
   <link rel="stylesheet" href="/style.css" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#128250;</text></svg>" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📺</text></svg>" />
 </head>
 <body>
   <div id="app">
@@ -14,85 +14,131 @@
         <span class="mark">ST</span>
         <div>
           <strong>Seasonal Tracker</strong>
-          <small id="season-chip">&mdash;</small>
+          <small id="season-chip">—</small>
         </div>
       </div>
       <nav class="ranges" id="ranges">
-        <button data-range="today" class="active">Today</button>
-        <button data-range="this_week">This week</button>
-        <button data-range="next_week">Next week</button>
-        <button data-range="week_after">Following</button>
-        <button data-range="library">My shows</button>
+        <button type="button" data-range="today" class="active">Today</button>
+        <button type="button" data-range="this_week">This week</button>
+        <button type="button" data-range="next_week">Next week</button>
+        <button type="button" data-range="week_after">Following</button>
+        <button type="button" data-range="library">My shows</button>
       </nav>
       <div class="tools">
-        <button id="btn-layout" title="Switch layout">Rows</button>
-        <button id="btn-add" class="primary">Add shows</button>
-        <button id="btn-settings" title="Settings">&#9881;</button>
+        <button type="button" id="btn-layout" title="Switch layout">Rows</button>
+        <button type="button" id="btn-add" class="primary">Add shows</button>
+        <button type="button" id="btn-settings" title="Settings">⚙</button>
       </div>
     </header>
 
     <section class="statusline">
-      <span id="range-label">Loading&hellip;</span>
+      <span id="range-label">Loading…</span>
       <span id="status-note"></span>
     </section>
 
     <main id="board" class="board"></main>
   </div>
 
-  <aside id="drawer" class="drawer hidden">
+  <aside id="drawer" class="drawer drawer-picker hidden">
     <div class="drawer-head">
       <h2>Add seasonal shows</h2>
-      <button id="drawer-close">Close</button>
+      <button type="button" id="drawer-close">Close</button>
     </div>
     <div class="picker-bar">
       <select id="season-select"></select>
-      <input id="search" type="search" placeholder="Search MyAnimeList / AniList titles&hellip;" />
+      <input id="search" type="search" placeholder="Search MyAnimeList / AniList titles…" />
+      <div class="seg" id="picker-layout">
+        <button type="button" data-pick="tiles" class="active">Tiles</button>
+        <button type="button" data-pick="rows">Rows</button>
+      </div>
     </div>
-    <p class="hint">Source: AniList (includes MAL ids). Dubs come from AnimeSchedule. Click a card to pin it to the widget.</p>
-    <div id="picker-grid" class="picker-grid"></div>
+    <p class="hint">Source: AniList (includes MAL ids). Dubs come from AnimeSchedule. Click a title to pin it.</p>
+    <div id="picker-grid" class="picker-grid tiles"></div>
     <div class="pager">
-      <button id="page-prev">Prev</button>
+      <button type="button" id="page-prev">Prev</button>
       <span id="page-info"></span>
-      <button id="page-next">Next</button>
+      <button type="button" id="page-next">Next</button>
     </div>
   </aside>
 
-  <aside id="settings" class="drawer hidden">
+  <aside id="settings" class="drawer drawer-settings hidden">
     <div class="drawer-head">
       <h2>Widget settings</h2>
-      <button id="settings-close">Close</button>
+      <button type="button" id="settings-close">Close</button>
     </div>
     <form id="settings-form" class="settings-form">
       <label>Layout
-        <select name="layout">
-          <option value="rows">Horizontal rows</option>
-          <option value="stacks">Vertical stacks (poster at bottom)</option>
-        </select>
+        <div class="select" data-name="layout">
+          <button type="button" class="select-btn"></button>
+          <ul class="select-menu">
+            <li data-value="rows">Horizontal rows</li>
+            <li data-value="stacks">Vertical stacks</li>
+          </ul>
+          <input type="hidden" name="layout" />
+        </div>
+      </label>
+      <label>Stack poster
+        <div class="select" data-name="stackPoster">
+          <button type="button" class="select-btn"></button>
+          <ul class="select-menu">
+            <li data-value="bottom">Poster at bottom (bottom-aligned)</li>
+            <li data-value="top">Poster at top (top-aligned)</li>
+          </ul>
+          <input type="hidden" name="stackPoster" />
+        </div>
       </label>
       <label>Theme
-        <select name="theme">
-          <option value="dark">Dark widget</option>
-          <option value="light">Light</option>
-        </select>
+        <div class="select" data-name="theme">
+          <button type="button" class="select-btn"></button>
+          <ul class="select-menu">
+            <li data-value="dark">Dark widget</li>
+            <li data-value="light">Light</li>
+          </ul>
+          <input type="hidden" name="theme" />
+        </div>
       </label>
       <label>Title language
-        <select name="titleLanguage">
-          <option value="english">English</option>
-          <option value="romaji">Romaji</option>
-        </select>
+        <div class="select" data-name="titleLanguage">
+          <button type="button" class="select-btn"></button>
+          <ul class="select-menu">
+            <li data-value="english">English</li>
+            <li data-value="romaji">Romaji</li>
+          </ul>
+          <input type="hidden" name="titleLanguage" />
+        </div>
       </label>
+      <label>Episode tracks
+        <div class="select" data-name="progressMode">
+          <button type="button" class="select-btn"></button>
+          <ul class="select-menu">
+            <li data-value="split">Separate SUB and DUB rows</li>
+            <li data-value="combined">Combined row (colour = air state)</li>
+          </ul>
+          <input type="hidden" name="progressMode" />
+        </div>
+      </label>
+      <div class="legend" id="combined-legend">
+        <span class="swatch unaired"></span> Unaired
+        <span class="swatch sub-aired"></span> Sub aired
+        <span class="swatch dub-aired"></span> Dub aired
+        <span class="swatch watched"></span> Watched
+      </div>
       <label class="check"><input type="checkbox" name="showSub" /> Show sub counts</label>
       <label class="check"><input type="checkbox" name="showDub" /> Show English dub counts</label>
       <label class="check"><input type="checkbox" name="compact" /> Compact cards</label>
       <label>Week starts
-        <select name="weekStart">
-          <option value="sunday">Sunday</option>
-          <option value="monday">Monday</option>
-        </select>
+        <div class="select" data-name="weekStart">
+          <button type="button" class="select-btn"></button>
+          <ul class="select-menu">
+            <li data-value="sunday">Sunday</li>
+            <li data-value="monday">Monday</li>
+          </ul>
+          <input type="hidden" name="weekStart" />
+        </div>
       </label>
       <button type="submit" class="primary">Save</button>
     </form>
-    <p class="hint">Resize this window to change how much of the desktop the widget covers. On KDE, right-click the title bar → More Actions → Keep Above Others, then pin size.</p>
+    <p class="hint">Native dropdowns are unreliable inside a Plasma/Chrome widget, so these lists open in-page. Combined mode uses one pip row: dark = unaired, cyan = sub only, gold = dub (sub usually already out), blue = watched.</p>
   </aside>
 
   <div id="toast" class="toast hidden"></div>
