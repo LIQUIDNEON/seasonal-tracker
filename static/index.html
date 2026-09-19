@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Seasonal Tracker</title>
-  <link rel="stylesheet" href="/style.css?v=bar2" />
-  <link rel="stylesheet" href="/compact.css?v=bar2" />
+  <link rel="stylesheet" href="/style.css?v=bar3" />
+  <link rel="stylesheet" href="/compact.css?v=bar3" />
   <style>
     .statusbar {
       display: flex !important;
@@ -19,9 +19,12 @@
     }
     .statusbar .ranges { margin-right: auto !important; flex-wrap: nowrap !important; }
     .statusbar .tools { margin-left: auto !important; flex-wrap: nowrap !important; }
-    #range-label, #season-chip, .bar-label, .season-chip, .statusline, #btn-minimal {
-      display: none !important;
-    }
+    #range-label, #season-chip, .bar-label, .season-chip, .statusline, #btn-minimal { display: none !important; }
+    #btn-layout { font-size: 0 !important; width: 26px !important; min-width: 26px !important; overflow: hidden !important; }
+    .week-strip.week-rows { flex-direction: column !important; width: 100% !important; }
+    .week-strip.week-rows .day-col { width: 100% !important; overflow: visible !important; }
+    .week-strip.week-rows .cards.rows { flex-direction: row !important; flex-wrap: wrap !important; width: 100% !important; }
+    .row-card .counts { display: none !important; }
   </style>
 </head>
 <body>
@@ -36,30 +39,18 @@
         <button type="button" data-range="library">My shows</button>
       </nav>
       <div class="tools">
-        <button type="button" id="btn-compact" class="icon-btn" title="Compact" aria-label="Compact">▣</button>
-        <button type="button" id="btn-layout" class="icon-btn" title="Rows / Stacks" aria-label="Layout">
-          <svg class="i-rows" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
-            <rect x="1" y="1" width="8" height="8" rx="1.5"/>
-            <rect x="11" y="1" width="8" height="8" rx="1.5"/>
-            <rect x="1" y="11" width="8" height="8" rx="1.5"/>
-            <rect x="11" y="11" width="8" height="8" rx="1.5"/>
-          </svg>
-          <svg class="i-stacks" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
-            <rect x="1" y="6" width="5" height="13" rx="1.2"/>
-            <rect x="7.5" y="1" width="5" height="18" rx="1.2"/>
-            <rect x="14" y="4" width="5" height="15" rx="1.2"/>
-          </svg>
+        <button type="button" id="btn-compact" class="icon-btn" title="Compact">▣</button>
+        <button type="button" id="btn-layout" class="icon-btn" title="Rows / Stacks">
+          <svg class="i-rows" viewBox="0 0 20 20" width="16" height="16"><rect x="1" y="1" width="8" height="8" rx="1.5"/><rect x="11" y="1" width="8" height="8" rx="1.5"/><rect x="1" y="11" width="8" height="8" rx="1.5"/><rect x="11" y="11" width="8" height="8" rx="1.5"/></svg>
+          <svg class="i-stacks" viewBox="0 0 20 20" width="16" height="16"><rect x="1" y="6" width="5" height="13" rx="1.2"/><rect x="7.5" y="1" width="5" height="18" rx="1.2"/><rect x="14" y="4" width="5" height="15" rx="1.2"/></svg>
         </button>
-        <button type="button" id="btn-float" class="icon-btn" title="Float" aria-label="Float">⧉</button>
-        <button type="button" id="btn-settings" class="icon-btn" title="Settings" aria-label="Settings">⚙</button>
+        <button type="button" id="btn-float" class="icon-btn" title="Float">⧉</button>
+        <button type="button" id="btn-settings" class="icon-btn" title="Settings">⚙</button>
       </div>
     </footer>
   </div>
   <aside id="drawer" class="drawer drawer-picker hidden">
-    <div class="drawer-head">
-      <h2>Add seasonal shows</h2>
-      <button type="button" id="drawer-close">Close</button>
-    </div>
+    <div class="drawer-head"><h2>Add seasonal shows</h2><button type="button" id="drawer-close">Close</button></div>
     <div class="picker-bar">
       <select id="season-select"></select>
       <input id="search" type="search" placeholder="Search titles…" />
@@ -76,81 +67,19 @@
     </div>
   </aside>
   <aside id="settings" class="drawer drawer-settings hidden">
-    <div class="drawer-head">
-      <h2>Widget settings</h2>
-      <button type="button" id="settings-close">Close</button>
-    </div>
+    <div class="drawer-head"><h2>Widget settings</h2><button type="button" id="settings-close">Close</button></div>
     <form id="settings-form" class="settings-form">
       <button type="button" id="btn-add" class="primary">Add shows</button>
-      <label>Layout
-        <div class="select" data-name="layout">
-          <button type="button" class="select-btn"></button>
-          <ul class="select-menu">
-            <li data-value="rows">Horizontal rows</li>
-            <li data-value="stacks">Vertical stacks</li>
-          </ul>
-          <input type="hidden" name="layout" />
-        </div>
-      </label>
-      <label>Stack poster
-        <div class="select" data-name="stackPoster">
-          <button type="button" class="select-btn"></button>
-          <ul class="select-menu">
-            <li data-value="bottom">Poster at bottom</li>
-            <li data-value="top">Poster at top</li>
-          </ul>
-          <input type="hidden" name="stackPoster" />
-        </div>
-      </label>
-      <label>Theme
-        <div class="select" data-name="theme">
-          <button type="button" class="select-btn"></button>
-          <ul class="select-menu">
-            <li data-value="dark">Dark widget</li>
-            <li data-value="light">Light</li>
-          </ul>
-          <input type="hidden" name="theme" />
-        </div>
-      </label>
-      <label>Title language
-        <div class="select" data-name="titleLanguage">
-          <button type="button" class="select-btn"></button>
-          <ul class="select-menu">
-            <li data-value="english">English</li>
-            <li data-value="romaji">Romaji</li>
-          </ul>
-          <input type="hidden" name="titleLanguage" />
-        </div>
-      </label>
-      <label>Episode tracks
-        <div class="select" data-name="progressMode">
-          <button type="button" class="select-btn"></button>
-          <ul class="select-menu">
-            <li data-value="split">Separate SUB and DUB rows</li>
-            <li data-value="combined">Combined row</li>
-          </ul>
-          <input type="hidden" name="progressMode" />
-        </div>
-      </label>
-      <div class="legend" id="combined-legend">
-        <span class="swatch unaired"></span> Unaired
-        <span class="swatch sub-aired"></span> Sub aired
-        <span class="swatch dub-aired"></span> Dub aired
-        <span class="swatch watched"></span> Watched
-      </div>
+      <label>Layout<div class="select" data-name="layout"><button type="button" class="select-btn"></button><ul class="select-menu"><li data-value="rows">Horizontal rows</li><li data-value="stacks">Vertical stacks</li></ul><input type="hidden" name="layout" /></div></label>
+      <label>Stack poster<div class="select" data-name="stackPoster"><button type="button" class="select-btn"></button><ul class="select-menu"><li data-value="bottom">Poster at bottom</li><li data-value="top">Poster at top</li></ul><input type="hidden" name="stackPoster" /></div></label>
+      <label>Theme<div class="select" data-name="theme"><button type="button" class="select-btn"></button><ul class="select-menu"><li data-value="dark">Dark widget</li><li data-value="light">Light</li></ul><input type="hidden" name="theme" /></div></label>
+      <label>Title language<div class="select" data-name="titleLanguage"><button type="button" class="select-btn"></button><ul class="select-menu"><li data-value="english">English</li><li data-value="romaji">Romaji</li></ul><input type="hidden" name="titleLanguage" /></div></label>
+      <label>Episode tracks<div class="select" data-name="progressMode"><button type="button" class="select-btn"></button><ul class="select-menu"><li data-value="split">Separate SUB and DUB rows</li><li data-value="combined">Combined row</li></ul><input type="hidden" name="progressMode" /></div></label>
+      <div class="legend" id="combined-legend"><span class="swatch unaired"></span> Unaired <span class="swatch sub-aired"></span> Sub aired <span class="swatch dub-aired"></span> Dub aired <span class="swatch watched"></span> Watched</div>
       <label class="check"><input type="checkbox" name="showSub" /> Show sub counts</label>
       <label class="check"><input type="checkbox" name="showDub" /> Show English dub counts</label>
       <label class="check"><input type="checkbox" name="compact" /> Compact cards</label>
-      <label>Week starts
-        <div class="select" data-name="weekStart">
-          <button type="button" class="select-btn"></button>
-          <ul class="select-menu">
-            <li data-value="sunday">Sunday</li>
-            <li data-value="monday">Monday</li>
-          </ul>
-          <input type="hidden" name="weekStart" />
-        </div>
-      </label>
+      <label>Week starts<div class="select" data-name="weekStart"><button type="button" class="select-btn"></button><ul class="select-menu"><li data-value="sunday">Sunday</li><li data-value="monday">Monday</li></ul><input type="hidden" name="weekStart" /></div></label>
       <button type="submit" class="primary">Save</button>
       <div class="reload-row">
         <button type="button" id="btn-reload-ui">Reload UI</button>
@@ -158,10 +87,7 @@
       </div>
     </form>
   </aside>
-  <div hidden>
-    <span id="range-label"></span>
-    <span id="season-chip"></span>
-  </div>
+  <div hidden><span id="range-label"></span><span id="season-chip"></span></div>
   <div id="toast" class="toast hidden"></div>
   <div id="hover-tip" class="hover-tip hidden"></div>
   <script src="/app.js"></script>
