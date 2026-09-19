@@ -37,3 +37,84 @@ def test_finished_show_keeps_its_last_known_airing_event() -> None:
     out = enrich_show(show, {}, {}, {})
     assert len(out["nextEvents"]) == 1
     assert out["nextEvents"][0]["episode"] == 2
+
+
+def test_cache_round_trip_uses_sqlite(monkeypatch, tmp_path) -> None:
+    import tracker_lib
+
+    monkeypatch.setattr(tracker_lib, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(tracker_lib, "LIBRARY_PATH", tmp_path / "library.json")
+    monkeypatch.setattr(tracker_lib, "SETTINGS_PATH", tmp_path / "settings.json")
+    monkeypatch.setattr(tracker_lib, "CACHE_DIR", tmp_path / "cache")
+    monkeypatch.setattr(tracker_lib, "DB_PATH", tmp_path / "tracker.db")
+
+    tracker_lib.ensure_database()
+    tracker_lib.cache_set("demo.json", {"a": 1, "b": [2, 3]})
+
+    assert tracker_lib.cache_get("demo.json", 60) == {"a": 1, "b": [2, 3]}
+
+
+def test_populate_weekly_schedule_skips_rows_missing_anime_id(monkeypatch, tmp_path) -> None:
+    import sqlite3
+
+    import tracker_lib
+
+    monkeypatch.setattr(tracker_lib, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(tracker_lib, "LIBRARY_PATH", tmp_path / "library.json")
+    monkeypatch.setattr(tracker_lib, "SETTINGS_PATH", tmp_path / "settings.json")
+    monkeypatch.setattr(tracker_lib, "CACHE_DIR", tmp_path / "cache")
+    monkeypatch.setattr(tracker_lib, "DB_PATH", tmp_path / "tracker.db")
+
+    bad = {"title": {"english": "Broken Entry"}, "airingSchedule": {"nodes": [{"episode": 1, "airingAt": 1750000000}]}}
+    good = {
+        "id": 42,
+        "title": {"english": "Good Entry", "romaji": "Good Entry"},
+        "airingSchedule": {"nodes": [{"episode": 1, "airingAt": 1750000000}]},
+    }
+    monkeypatch.setattr(tracker_lib.HUB, "sub_schedule", lambda: [bad, good])
+
+    tracker_lib.ensure_database()
+    inserted = tracker_lib.populate_weekly_schedule(2025, 9, source="sub")
+
+    assert inserted == 1
+    with sqlite3.connect(tracker_lib.DB_PATH) as conn:
+        rows = conn.execute('SELECT COUNT(*) FROM weekly_schedule').fetchone()[0]
+    assert rows == 1
+
+
+def test_library_title_jap_comes_from_romaji(monkeypatch, tmp_path) -> None:
+    import sqlite3
+
+    import tracker_lib
+
+    monkeypatch.setattr(tracker_lib, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(tracker_lib, "LIBRARY_PATH", tmp_path / "library.json")
+    monkeypatch.setattr(tracker_lib, "SETTINGS_PATH", tmp_path / "settings.json")
+    monkeypatch.setattr(tracker_lib, "CACHE_DIR", tmp_path / "cache")
+    monkeypatch.setattr(tracker_lib, "DB_PATH", tmp_path / "tracker.db")
+
+    tracker_lib.ensure_database()
+    tracker_lib.db_add_library_show(
+        {
+            "id": 42,
+            "idMal": 99,
+            "title": "English Title",
+            "titles": {"english": "English Title", "romaji": "Romaji Title"},
+            "cover": "cover.jpg",
+            "episodes": 12,
+            "format": "TV",
+            "status": "RELEASING",
+            "season": "SPRING",
+            "seasonYear": 2026,
+        }
+    )
+
+    with sqlite3.connect(tracker_lib.DB_PATH) as conn:
+        cols = [row[1] for row in conn.execute("PRAGMA table_info(library)")]
+        assert "title_jap" in cols
+        assert "titles_json" not in cols
+        row = conn.execute(
+            "SELECT title, title_jap FROM library WHERE id = 42"
+        ).fetchone()
+
+    assert row == ("English Title", "Romaji Title")

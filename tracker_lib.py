@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import os
+import sqlite3
 import threading
 import time
 from datetime import datetime, timedelta, timezone
@@ -19,6 +20,7 @@ DATA_DIR = Path(os.environ.get("SEASONAL_TRACKER_HOME", Path.home() / ".config" 
 LIBRARY_PATH = DATA_DIR / "library.json"
 SETTINGS_PATH = DATA_DIR / "settings.json"
 CACHE_DIR = DATA_DIR / "cache"
+DB_PATH = DATA_DIR / "tracker.db"
 
 ANILIST = "https://graphql.anilist.co"
 ANISCHEDULE_RAW = "https://raw.githubusercontent.com/RockinChaos/AniSchedule/master/readable"
@@ -79,12 +81,13 @@ def week_bounds(offset: int, week_start: str = "sunday") -> tuple[datetime, date
 
 
 def schedule_window(range_key: str, week_start: str = "sunday", offset: int = 0, now: datetime | None = None) -> tuple[datetime, datetime, str]:
-    local = (now or datetime.now().astimezone()).astimezone()
+    now_utc_dt = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     if range_key == "today":
-        start = local.replace(hour=0, minute=0, second=0, microsecond=0)
+        start = now_utc_dt.replace(hour=0, minute=0, second=0, microsecond=0)
         return start, start + timedelta(days=1), start.strftime("%A %-d %b")
 
-    base_start, _ = rolling_week_bounds(week_start, local)
+    today = now_utc_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+    base_start = week_start_for_date(today, week_start)
     delta = offset
     if range_key == "next_week":
         delta += 1
@@ -97,8 +100,8 @@ def schedule_window(range_key: str, week_start: str = "sunday", offset: int = 0,
 
 
 def rolling_week_bounds(week_start: str = "sunday", now: datetime | None = None) -> tuple[datetime, datetime]:
-    local = (now or datetime.now().astimezone()).astimezone()
-    today = local.replace(hour=0, minute=0, second=0, microsecond=0)
+    now_utc_dt = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    today = now_utc_dt.replace(hour=0, minute=0, second=0, microsecond=0)
     week_origin = week_start_for_date(today, week_start)
     week_end = (week_origin + timedelta(days=6)).replace(hour=0, minute=0, second=0, microsecond=0)
     return week_origin, week_end + timedelta(days=1)
@@ -141,7 +144,436 @@ def http_json(url: str, payload: dict | None = None, timeout: int = 25) -> Any:
         return json.loads(resp.read().decode())
 
 
-def cache_get(name: str, ttl: int) -> Any | None:
+def ensure_database() -> None:
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("DROP TABLE IF EXISTS cache")
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS media (
+                id INTEGER PRIMARY KEY,
+                season_key TEXT NOT NULL,
+                season TEXT,
+                season_year INTEGER,
+                id_mal INTEGER,
+                title_json TEXT,
+                episodes INTEGER,
+                format TEXT,
+                status TEXT,
+                genres_json TEXT,
+                average_score REAL,
+                duration INTEGER,
+                is_adult INTEGER,
+                site_url TEXT,
+                cover_image_json TEXT,
+                next_airing_episode_json TEXT,
+                start_date_json TEXT,
+                raw_json TEXT,
+                fetched_at INTEGER NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS weekly_schedule (
+                year INTEGER NOT NULL,
+                month INTEGER NOT NULL,
+                week_num INTEGER NOT NULL,
+                anime_id INTEGER NOT NULL,
+                anime_title TEXT NOT NULL,
+                episode INTEGER NOT NULL,
+                air_day TEXT NOT NULL,
+                air_date TEXT NOT NULL,
+                air_ts INTEGER NOT NULL,
+                source TEXT NOT NULL,
+                fetched_at INTEGER NOT NULL,
+                UNIQUE(year, month, week_num, anime_id, episode)
+                ON CONFLICT REPLACE
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS library (
+                id INTEGER PRIMARY KEY,
+                id_mal INTEGER,
+                title TEXT,
+                title_jap TEXT,
+                cover TEXT,
+                color TEXT,
+                episodes INTEGER,
+                format TEXT,
+                status TEXT,
+                season TEXT,
+                season_year INTEGER,
+                next_sub_episode INTEGER,
+                next_sub_at TEXT,
+                watched_sub INTEGER NOT NULL DEFAULT 0,
+                watched_dub INTEGER NOT NULL DEFAULT 0,
+                note TEXT NOT NULL DEFAULT '',
+                added_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+
+        library_cols = {
+            row[1]
+            for row in conn.execute("PRAGMA table_info(library)").fetchall()
+        }
+        if "titles_json" in library_cols:
+            conn.execute("ALTER TABLE library RENAME TO library_old")
+            conn.execute(
+                """
+                CREATE TABLE library (
+                    id INTEGER PRIMARY KEY,
+                    id_mal INTEGER,
+                    title TEXT,
+                    title_jap TEXT,
+                    cover TEXT,
+                    color TEXT,
+                    episodes INTEGER,
+                    format TEXT,
+                    status TEXT,
+                    season TEXT,
+                    season_year INTEGER,
+                    next_sub_episode INTEGER,
+                    next_sub_at TEXT,
+                    watched_sub INTEGER NOT NULL DEFAULT 0,
+                    watched_dub INTEGER NOT NULL DEFAULT 0,
+                    note TEXT NOT NULL DEFAULT '',
+                    added_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                INSERT INTO library (
+                    id, id_mal, title, title_jap, cover, color, episodes, format,
+                    status, season, season_year, next_sub_episode, next_sub_at,
+                    watched_sub, watched_dub, note, added_at, updated_at
+                )
+                SELECT
+                    id, id_mal, title,
+                    json_extract(titles_json, '$.romaji'),
+                    cover, color, episodes, format,
+                    status, season, season_year, next_sub_episode, next_sub_at,
+                    watched_sub, watched_dub, note, added_at, updated_at
+                FROM library_old
+                """
+            )
+            conn.execute("DROP TABLE library_old")
+
+        if "title_jap" not in library_cols and "titles_json" not in library_cols:
+            conn.execute(
+                "ALTER TABLE library ADD COLUMN title_jap TEXT"
+            )
+            conn.execute(
+                "UPDATE library SET title_jap = title WHERE title_jap IS NULL"
+            )
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_media_season ON media (season_key, season_year, season)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_weekly_schedule ON weekly_schedule (year, month, week_num, air_day, anime_id)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_library_updated ON library (updated_at)"
+        )
+        conn.commit()
+
+
+def store_media_records(media_list: list[dict], season: str, year: int) -> None:
+    if not media_list:
+        return
+    ensure_database()
+    season_key = f"{season}-{year}"
+    now_ts = int(time.time())
+    with sqlite3.connect(DB_PATH) as conn:
+        for item in media_list:
+            if not isinstance(item, dict):
+                continue
+            raw_json = json.dumps(item)
+            row = {
+                "id": int(item.get("id")),
+                "season_key": season_key,
+                "season": item.get("season") or season,
+                "season_year": int(item.get("seasonYear") or year),
+                "id_mal": item.get("idMal"),
+                "title_json": json.dumps(item.get("title") or {}),
+                "episodes": item.get("episodes"),
+                "format": item.get("format"),
+                "status": item.get("status"),
+                "genres_json": json.dumps(item.get("genres") or []),
+                "average_score": item.get("averageScore"),
+                "duration": item.get("duration"),
+                "is_adult": 1 if item.get("isAdult") else 0,
+                "site_url": item.get("siteUrl"),
+                "cover_image_json": json.dumps(item.get("coverImage") or {}),
+                "next_airing_episode_json": json.dumps(item.get("nextAiringEpisode") or {}),
+                "start_date_json": json.dumps(item.get("startDate") or {}),
+                "raw_json": raw_json,
+                "fetched_at": now_ts,
+            }
+            conn.execute(
+                """
+                INSERT INTO media (
+                    id, season_key, season, season_year, id_mal,
+                    title_json, episodes, format, status, genres_json,
+                    average_score, duration, is_adult, site_url,
+                    cover_image_json, next_airing_episode_json, start_date_json,
+                    raw_json, fetched_at
+                ) VALUES (
+                    :id, :season_key, :season, :season_year, :id_mal,
+                    :title_json, :episodes, :format, :status, :genres_json,
+                    :average_score, :duration, :is_adult, :site_url,
+                    :cover_image_json, :next_airing_episode_json, :start_date_json,
+                    :raw_json, :fetched_at
+                )
+                ON CONFLICT(id) DO UPDATE SET
+                    season_key = excluded.season_key,
+                    season = excluded.season,
+                    season_year = excluded.season_year,
+                    id_mal = excluded.id_mal,
+                    title_json = excluded.title_json,
+                    episodes = excluded.episodes,
+                    format = excluded.format,
+                    status = excluded.status,
+                    genres_json = excluded.genres_json,
+                    average_score = excluded.average_score,
+                    duration = excluded.duration,
+                    is_adult = excluded.is_adult,
+                    site_url = excluded.site_url,
+                    cover_image_json = excluded.cover_image_json,
+                    next_airing_episode_json = excluded.next_airing_episode_json,
+                    start_date_json = excluded.start_date_json,
+                    raw_json = excluded.raw_json,
+                    fetched_at = excluded.fetched_at
+                """,
+                row,
+            )
+        conn.commit()
+
+
+def week_number_for_month(day: datetime.date) -> int:
+    return ((day.day - 1) // 7) + 1
+
+
+def populate_weekly_schedule(year: int, month: int, source: str = "sub") -> int:
+    ensure_database()
+    now_ts = int(time.time())
+    raw_records = HUB.sub_schedule() if source == "sub" else HUB.dub_schedule()
+    records: list[dict] = []
+    for item in raw_records:
+        if not isinstance(item, dict):
+            continue
+        anime_id_raw = item.get("id")
+        if anime_id_raw is None:
+            continue
+        try:
+            anime_id = int(anime_id_raw)
+        except (TypeError, ValueError):
+            continue
+        details = HUB.media_details(anime_id)
+        media = ((details.get("data") or {}).get("Media")) or {}
+        schedule = media.get("airingSchedule") or {}
+        nodes = (schedule.get("nodes") or [])
+        if nodes:
+            item = dict(item)
+            item["airingSchedule"] = schedule
+        records.append(item)
+
+    inserted = 0
+    with sqlite3.connect(DB_PATH) as conn:
+        for item in records:
+            if not isinstance(item, dict):
+                continue
+            anime_id_raw = item.get("id")
+            if anime_id_raw is None:
+                continue
+            try:
+                anime_id = int(anime_id_raw)
+            except (TypeError, ValueError):
+                continue
+            title = pick_title(item.get("title"), "english") or pick_title(item.get("title"), "romaji") or "Unknown"
+            nodes = ((item.get("airingSchedule") or {}).get("nodes") or [])
+            for node in nodes:
+                if not isinstance(node, dict):
+                    continue
+                when = parse_airing(node.get("airingAt"))
+                if when is None:
+                    continue
+                dt = when.astimezone(timezone.utc).date()
+                if dt.year != year or dt.month != month:
+                    continue
+                week_num = week_number_for_month(dt)
+                row = {
+                    "year": year,
+                    "month": month,
+                    "week_num": week_num,
+                    "anime_id": anime_id,
+                    "anime_title": title,
+                    "episode": int(node.get("episode") or 0),
+                    "air_day": dt.strftime("%A"),
+                    "air_date": dt.isoformat(),
+                    "air_ts": int(when.timestamp()),
+                    "source": source,
+                    "fetched_at": now_ts,
+                }
+                conn.execute(
+                    """
+                    INSERT INTO weekly_schedule (
+                        year, month, week_num, anime_id, anime_title,
+                        episode, air_day, air_date, air_ts, source, fetched_at
+                    ) VALUES (
+                        :year, :month, :week_num, :anime_id, :anime_title,
+                        :episode, :air_day, :air_date, :air_ts, :source, :fetched_at
+                    )
+                    ON CONFLICT(year, month, week_num, anime_id, episode)
+                    DO UPDATE SET
+                        anime_title = excluded.anime_title,
+                        air_day = excluded.air_day,
+                        air_date = excluded.air_date,
+                        air_ts = excluded.air_ts,
+                        source = excluded.source,
+                        fetched_at = excluded.fetched_at
+                    """,
+                    row,
+                )
+                inserted += 1
+        conn.commit()
+    return inserted
+
+
+def db_get_library() -> list[dict]:
+    ensure_database()
+    with sqlite3.connect(DB_PATH) as conn:
+        rows = conn.execute(
+            """
+            SELECT id, id_mal, title, title_jap, cover, color, episodes, format,
+                   status, season, season_year, next_sub_episode, next_sub_at,
+                   watched_sub, watched_dub, note, added_at, updated_at
+            FROM library
+            ORDER BY updated_at DESC
+            """
+        ).fetchall()
+    out: list[dict] = []
+    for row in rows:
+        out.append(
+            {
+                "id": row[0],
+                "idMal": row[1],
+                "title": row[2],
+                "titleJap": row[3],
+                "cover": row[4],
+                "color": row[5],
+                "episodes": row[6],
+                "format": row[7],
+                "status": row[8],
+                "season": row[9],
+                "seasonYear": row[10],
+                "nextSubEpisode": row[11],
+                "nextSubAt": row[12],
+                "watchedSub": row[13],
+                "watchedDub": row[14],
+                "note": row[15],
+                "addedAt": row[16],
+                "updatedAt": row[17],
+            }
+        )
+    return out
+
+
+def db_add_library_show(payload: dict) -> list[dict]:
+    ensure_database()
+    now = now_utc().isoformat()
+    titles = payload.get("titles") or {}
+    row = {
+        "id": int(payload["id"]),
+        "idMal": payload.get("idMal"),
+        "title": payload.get("title") or "",
+        "titleJap": (titles.get("romaji") if isinstance(titles, dict) else None) or payload.get("titleJap") or payload.get("title") or "",
+        "cover": payload.get("cover"),
+        "color": payload.get("color"),
+        "episodes": payload.get("episodes"),
+        "format": payload.get("format"),
+        "status": payload.get("status"),
+        "season": payload.get("season"),
+        "seasonYear": payload.get("seasonYear"),
+        "nextSubEpisode": payload.get("nextSubEpisode"),
+        "nextSubAt": payload.get("nextSubAt"),
+        "watchedSub": int(payload.get("watchedSub", 0) or 0),
+        "watchedDub": int(payload.get("watchedDub", 0) or 0),
+        "note": payload.get("note") or "",
+        "addedAt": payload.get("addedAt") or now,
+        "updatedAt": now,
+    }
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            """
+            INSERT INTO library (
+                id, id_mal, title, title_jap, cover, color, episodes, format,
+                status, season, season_year, next_sub_episode, next_sub_at,
+                watched_sub, watched_dub, note, added_at, updated_at
+            ) VALUES (
+                :id, :idMal, :title, :titleJap, :cover, :color, :episodes, :format,
+                :status, :season, :seasonYear, :nextSubEpisode, :nextSubAt,
+                :watchedSub, :watchedDub, :note, :addedAt, :updatedAt
+            )
+            ON CONFLICT(id) DO UPDATE SET
+                id_mal = excluded.id_mal,
+                title = excluded.title,
+                title_jap = excluded.title_jap,
+                cover = excluded.cover,
+                color = excluded.color,
+                episodes = excluded.episodes,
+                format = excluded.format,
+                status = excluded.status,
+                season = excluded.season,
+                season_year = excluded.season_year,
+                next_sub_episode = excluded.next_sub_episode,
+                next_sub_at = excluded.next_sub_at,
+                watched_sub = excluded.watched_sub,
+                watched_dub = excluded.watched_dub,
+                note = excluded.note,
+                updated_at = excluded.updated_at
+            """,
+            row,
+        )
+        conn.commit()
+    return db_get_library()
+
+
+def db_remove_library_show(show_id: int) -> list[dict]:
+    ensure_database()
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("DELETE FROM library WHERE id = ?", (int(show_id),))
+        conn.commit()
+    return db_get_library()
+
+
+def db_update_library_progress(show_id: int, **kwargs: Any) -> list[dict]:
+    ensure_database()
+    updates: dict[str, Any] = {"updated_at": now_utc().isoformat()}
+    if "watchedSub" in kwargs:
+        updates["watched_sub"] = max(0, int(kwargs["watchedSub"]))
+    if "watchedDub" in kwargs:
+        updates["watched_dub"] = max(0, int(kwargs["watchedDub"]))
+    if "note" in kwargs:
+        updates["note"] = str(kwargs["note"])
+    if not updates or len(updates) == 1:
+        return db_get_library()
+    assignments = ", ".join(f"{key} = ?" for key in updates)
+    values = list(updates.values()) + [int(show_id)]
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(f"UPDATE library SET {assignments} WHERE id = ?", values)
+        conn.commit()
+    return db_get_library()
+
+
+def _legacy_cache_get(name: str, ttl: int) -> Any | None:
     path = CACHE_DIR / name
     if not path.exists():
         return None
@@ -154,11 +586,27 @@ def cache_get(name: str, ttl: int) -> Any | None:
         return None
 
 
+def cache_get(name: str, ttl: int) -> Any | None:
+    ensure_database()
+    legacy = _legacy_cache_get(name, ttl)
+    if legacy is not None:
+        if name.endswith(".json"):
+            prefix = name.rsplit("-", 1)[0] if "-" in name else name
+        else:
+            prefix = name
+        # A legacy JSON cache entry may still be used during transition; we keep
+        # it as a fallback, but the canonical database is the normalized media table.
+        return legacy
+    return None
+
+
 def cache_set(name: str, data: Any) -> None:
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    payload = json.dumps(data)
+    ensure_database()
     path = CACHE_DIR / name
     tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(data))
+    tmp.write_text(payload)
     tmp.replace(path)
 
 
@@ -204,6 +652,8 @@ class DataHub:
         key = f"season-{season}-{year}-p{page}.json"
         cached = cache_get(key, ttl=6 * 3600)
         if cached is not None:
+            media_page = ((cached.get("data") or {}).get("Page") or {}).get("media") or []
+            store_media_records(media_page, season, year)
             return cached
         query = """
         query ($page: Int, $season: MediaSeason, $seasonYear: Int) {
@@ -221,6 +671,8 @@ class DataHub:
         """
         raw = self.anilist(query, {"page": page, "season": season, "seasonYear": year})
         cache_set(key, raw)
+        media_page = ((raw.get("data") or {}).get("Page") or {}).get("media") or []
+        store_media_records(media_page, season, year)
         return raw
 
     def search(self, q: str) -> dict:
@@ -402,6 +854,15 @@ def enrich_show(show: dict, sub_map: dict[int, dict], dub_map: dict[int, dict], 
             next_events.append({"kind": "sub", "episode": nxt["episode"], "at": nxt["at"], "ts": nxt["ts"]})
     if dub_at and dub_ep_num and not (dub.get("delayedIndefinitely") if dub else False):
         next_events.append({"kind": "dub", "episode": dub_ep_num, "at": dub_at.isoformat(), "ts": int(dub_at.timestamp())})
+    tagged_day = None
+    candidate_events = []
+    for ev in next_events + [{"at": n["at"], "ts": n["ts"]} for n in upcoming_sub]:
+        when = parse_airing(ev.get("at"))
+        if when is not None:
+            candidate_events.append(when.astimezone(timezone.utc))
+    if candidate_events:
+        tagged_day = min(candidate_events).date().isoformat()
+
     out = dict(show)
     out.update({
         "subAired": sub_aired,
@@ -413,6 +874,7 @@ def enrich_show(show: dict, sub_map: dict[int, dict], dub_map: dict[int, dict], 
         "nextEvents": sorted(next_events, key=lambda e: e["ts"]),
         "upcomingSub": upcoming_sub[:8],
         "hasDubSchedule": dub is not None,
+        "airDay": tagged_day,
     })
     return out
 

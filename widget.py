@@ -8,7 +8,7 @@ import os
 import sys
 import threading
 import webbrowser
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.error import HTTPError
@@ -233,27 +233,17 @@ class Handler(SimpleHTTPRequestHandler):
             days[key] = []
             current += timedelta(days=1)
 
-        floating = []
         for show in payload["shows"]:
-            hits = event_in_range(show.get("nextEvents") or [], start, end)
-            if not hits:
-                if range_key == "library":
-                    floating.append(show)
+            tagged_day = show.get("airDay")
+            if not tagged_day:
                 continue
-            for hit in hits:
-                when = parse_airing(hit["at"]).astimezone()
-                day_key = when.strftime("%Y-%m-%d")
-                bucket = days.setdefault(day_key, [])
-                existing = next((s for s in bucket if s.get("id") == show.get("id")), None)
-                if existing:
-                    existing.setdefault("focusAll", [existing["focus"]]).append(hit)
-                    if hit["ts"] < (existing.get("focus") or {}).get("ts", 10**12):
-                        existing["focus"] = hit
-                else:
-                    entry = dict(show)
-                    entry["focus"] = hit
-                    entry["focusAll"] = [hit]
-                    bucket.append(entry)
+            if tagged_day not in days:
+                continue
+            bucket = days[tagged_day]
+            entry = dict(show)
+            entry["focus"] = {"at": f"{tagged_day}T00:00:00Z", "ts": int(datetime.fromisoformat(f"{tagged_day}T00:00:00+00:00").timestamp())}
+            entry["focusAll"] = [entry["focus"]]
+            bucket.append(entry)
         for items in days.values():
             items.sort(key=lambda s: (s.get("focus") or {}).get("ts") or 0)
         ordered = [
