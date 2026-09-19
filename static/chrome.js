@@ -3,12 +3,25 @@
     const css = document.createElement('style');
     css.id = 'st-layout-css';
     css.textContent = [
-      'body.layout-bar .week-strip{display:flex!important;flex-direction:row!important;align-items:flex-start!important;width:100%!important;}',
-      'body.layout-bar .week-strip .day-col{flex:1 1 0!important;min-width:150px!important;overflow:hidden!important;width:auto!important;}',
+      'body.layout-bar .week-strip{display:flex!important;flex-direction:row!important;width:100%!important;}',
+      'body.layout-bar .week-strip .day-col{flex:1 1 0!important;min-width:150px!important;overflow:hidden!important;}',
       'body.layout-row .week-strip{display:flex!important;flex-direction:column!important;width:100%!important;}',
-      'body.layout-row .week-strip .day-col{width:100%!important;max-width:100%!important;flex:0 0 auto!important;overflow:hidden!important;}',
-      'body.layout-bar .week-strip .cards,body.layout-row .week-strip .cards{display:flex!important;flex-direction:row!important;flex-wrap:wrap!important;width:100%!important;}',
-      '.stack-card.compact,.row-card.compact{flex:0 0 auto!important;}'
+      'body.layout-row .week-strip .day-col{width:100%!important;max-width:100%!important;overflow:hidden!important;}',
+      'body.layout-bar .week-strip .cards,body.layout-row .week-strip .cards{display:flex!important;flex-wrap:wrap!important;width:100%!important;gap:8px!important;}',
+      '.remain-tiles{display:flex!important;gap:6px!important;flex-wrap:wrap!important;}',
+      '.remain-tile{display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;min-width:52px!important;padding:6px 8px!important;border-radius:10px!important;}',
+      '.remain-tile b{font-size:16px!important;font-weight:750!important;display:block!important;}',
+      '.remain-tile small{font-size:8px!important;letter-spacing:.06em!important;text-transform:uppercase!important;display:block!important;}',
+      '.remain-tile.sub{background:color-mix(in srgb,#ff8a5b 22%,var(--card-2,#1c2430))!important;color:#ff8a5b!important;}',
+      '.remain-tile.dub{background:color-mix(in srgb,#3dd68c 22%,var(--card-2,#1c2430))!important;color:#3dd68c!important;}',
+      '.remain-tile.done{background:color-mix(in srgb,#3dd68c 22%,var(--card-2,#1c2430))!important;color:#3dd68c!important;}',
+      '.statusbar{display:flex!important;align-items:center!important;height:32px!important;}',
+      '.statusbar .tools{display:flex!important;flex-wrap:nowrap!important;align-items:center!important;gap:4px!important;margin-left:auto!important;}',
+      '.statusbar .icon-btn{width:26px!important;height:26px!important;display:grid!important;place-items:center!important;padding:0!important;}',
+      '#btn-layout .i-bar{display:none!important;fill:currentColor;}',
+      '#btn-layout .i-row{display:block!important;fill:currentColor;}',
+      '#btn-layout.is-bar .i-row{display:none!important;}',
+      '#btn-layout.is-bar .i-bar{display:block!important;}'
     ].join('');
     document.head.appendChild(css);
   }
@@ -23,7 +36,6 @@
   window.applyTheme = function () {
     if (typeof originalApply === 'function') originalApply();
     state.settings.compact = true;
-    state.settings.stackPoster = 'top';
     document.body.classList.add('compact');
     document.body.classList.toggle('layout-bar', isBar());
     document.body.classList.toggle('layout-row', !isBar());
@@ -106,9 +118,4 @@
     requestAnimationFrame(fitCards);
   };
   window.addEventListener('resize', function () { requestAnimationFrame(fitCards); });
-  const floatBtn = document.querySelector('#btn-float');
-  if (floatBtn) floatBtn.addEventListener('click', function () {
-    fetch('/api/float', { method: 'POST', body: '{}' }).catch(function () {});
-    window.open(location.origin + '/', 'seasonal-tracker-float', 'width=960,height=620');
-  });
 })();
