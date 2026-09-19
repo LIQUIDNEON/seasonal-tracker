@@ -274,6 +274,11 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 def open_window(url: str, width: int, height: int) -> None:
+    """Dev fallback: open a Chrome --app window when launched from a terminal.
+
+    The Plasma plasmoid does not use this path. It loads the same URL inside
+    plasmashell via Qt WebEngine. Prefer ./install-desktop.sh on Nobara KDE.
+    """
     candidates = [
         ["google-chrome-stable", f"--app={url}", f"--window-size={width},{height}", "--class=SeasonalTracker"],
         ["google-chrome", f"--app={url}", f"--window-size={width},{height}", "--class=SeasonalTracker"],
@@ -301,6 +306,8 @@ def open_window(url: str, width: int, height: int) -> None:
 
 
 def main() -> None:
+    # --no-browser is what the systemd user unit passes so plasmashell (or
+    # launch-window.sh) can attach to an already-running local server.
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     STATIC.mkdir(parents=True, exist_ok=True)
