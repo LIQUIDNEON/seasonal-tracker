@@ -1,6 +1,5 @@
 (function () {
   const STORE = 'st-nexus-urls';
-  const HOLD_MS = 8000;
 
   const css = document.createElement('style');
   css.textContent = [
@@ -51,6 +50,9 @@
     }).catch(function () {
       fetch('/api/open?url=' + encodeURIComponent(url)).catch(function () {});
     });
+  }
+  function insideWidget(el) {
+    return !!(el && el.closest && (el.closest('#app') || el.closest('.statusbar') || el.closest('.drawer')));
   }
 
   function fmtWhen(at) {
@@ -113,6 +115,8 @@
 
   function restoreTitle(input, show) {
     if (!input.parentNode) return;
+    const url = input.value.trim();
+    if (isSeriesUrl(url)) persist(show, url);
     const h = document.createElement('h4');
     h.textContent = show.title;
     h.title = titleText(show);
@@ -130,32 +134,21 @@
     titleEl.replaceWith(input);
     input.focus();
     input.select();
-    let timer = setTimeout(function () { restoreTitle(input, show); }, HOLD_MS);
-    function bump() {
-      clearTimeout(timer);
-      timer = setTimeout(function () { restoreTitle(input, show); }, HOLD_MS);
+    function close() {
+      document.removeEventListener('mousedown', onDocClick, true);
+      restoreTitle(input, show);
     }
-    input.addEventListener('input', bump);
-    input.addEventListener('paste', function () {
-      setTimeout(function () {
-        const url = input.value.trim();
-        if (isSeriesUrl(url)) persist(show, url);
-        bump();
-      }, 0);
-    });
+    function onDocClick(ev) {
+      if (ev.target === input) return;
+      if (!insideWidget(ev.target)) return;
+      close();
+    }
+    document.addEventListener('mousedown', onDocClick, true);
     input.addEventListener('keydown', function (ev) {
-      if (ev.key === 'Enter') {
+      if (ev.key === 'Enter' || ev.key === 'Escape') {
         ev.preventDefault();
-        const url = input.value.trim();
-        if (isSeriesUrl(url)) persist(show, url);
-        restoreTitle(input, show);
+        close();
       }
-      if (ev.key === 'Escape') restoreTitle(input, show);
-    });
-    input.addEventListener('blur', function () {
-      const url = input.value.trim();
-      if (isSeriesUrl(url)) persist(show, url);
-      setTimeout(function () { restoreTitle(input, show); }, 400);
     });
   }
 
@@ -167,8 +160,7 @@
       ev.stopPropagation();
       hideTip();
       const saved = nexusFor(show);
-      const opened = saved || searchUrl(show.title);
-      openNexus(opened);
+      openNexus(saved || searchUrl(show.title));
       showInput(title, show, saved || '');
     });
   }
