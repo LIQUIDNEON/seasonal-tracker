@@ -1,28 +1,34 @@
 Seasonal Tracker
 ===============
 
-Clone
+Install as a desktop widget
   git clone https://github.com/LIQUIDNEON/seasonal-tracker.git
   cd seasonal-tracker
-  chmod +x launch.sh
+  chmod +x install-desktop.sh launch.sh launch-window.sh
+  ./install-desktop.sh
+
+KDE Plasma
+  Right-click desktop → Add Widgets → Seasonal Tracker
+  Resize to the screen slice you want
+  If missing: kquitapp6 plasmashell && kstart6 plasmashell
+  Needs: sudo dnf install -y qt6-qtwebengine
+
+GNOME / other
+  ./launch-window.sh
+  Keep the window on top from the title-bar menu
+  Backend already autostarts via systemd --user
+
+Dev
   ./launch.sh
+  ./launch.sh --no-browser
+  python3 widget.py --port 9000
 
-  or
+Service
+  systemctl --user status seasonal-tracker.service
+  systemctl --user restart seasonal-tracker.service
 
-  python3 widget.py
-
-That opens a local app window on http://127.0.0.1:8765/
-Use --no-browser if you only want the server.
-Use --port 9000 to change the port.
-
-On KDE (Nobara Official)
-  1. Run ./launch.sh
-  2. Resize the window to the slice of screen you want
-  3. Right-click the title bar → More Actions → Keep Above Others
-  4. Optional: pin it on one virtual desktop only
-  5. Autostart: copy seasonal-tracker.desktop to ~/.local/share/applications/
-     and add it in System Settings → Autostart
-     Set Exec= and Path= to the cloned folder first.
+Uninstall widget packaging
+  ./install-desktop.sh uninstall
 
 First-time setup
   1. Click Add shows
@@ -36,6 +42,3 @@ Data
   Titles, posters, sub air times: AniList (MAL ids stored on every show)
   English dub air times / dubbed episode counts: AnimeSchedule via AniSchedule feeds
   Your pins and watch counts: ~/.config/seasonal-tracker/library.json
-
-Stop
-  Close the window, then Ctrl+C in the terminal if the server is still running.

@@ -2,10 +2,10 @@
 Type=Application
 Name=Seasonal Tracker
 Comment=Desktop widget for seasonal anime episode tracking
-Exec=python3 widget.py
+Exec=launch-window.sh
 Path=
 Icon=video-x-generic
 Terminal=false
 Categories=AudioVideo;Utility;
 StartupWMClass=SeasonalTracker
-# After cloning, set Path= to the repo directory (and Exec=python3 /full/path/widget.py if needed).
+# install-desktop.sh rewrites Exec= and Path= to absolute paths.
