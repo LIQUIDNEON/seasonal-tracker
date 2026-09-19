@@ -83,8 +83,7 @@ def rolling_week_bounds(week_start: str = "sunday", now: datetime | None = None)
     today = local.replace(hour=0, minute=0, second=0, microsecond=0)
     week_origin = week_start_for_date(today, week_start)
     week_end = (week_origin + timedelta(days=6)).replace(hour=0, minute=0, second=0, microsecond=0)
-    window_end = max(today, week_end) + timedelta(days=1)
-    return today, window_end
+    return week_origin, week_end + timedelta(days=1)
 
 
 def jst_weekday(value: Any) -> int | None:

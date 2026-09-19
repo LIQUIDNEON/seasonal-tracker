@@ -2,10 +2,7 @@
   const KEY = 'st-card-sort';
   const OPTIONS = [
     { id: 'name', label: 'Name' },
-    { id: 'air', label: 'Air time' },
-    { id: 'left', label: 'Episodes left' },
-    { id: 'progress', label: 'Progress' },
-    { id: 'score', label: 'Score' }
+    { id: 'air', label: 'Air date' }
   ];
 
   let mode = localStorage.getItem(KEY) || 'name';
@@ -13,28 +10,53 @@
 
   const css = document.createElement('style');
   css.textContent = [
-    '.sort-wrap{display:inline-flex;align-items:center;gap:4px;margin-right:4px;}',
-    '.sort-wrap label{font-size:10px;opacity:.7;text-transform:uppercase;letter-spacing:.04em;}',
-    '.sort-wrap select{height:22px;font-size:11px;background:var(--card-2,#1c2430);',
-    'color:var(--text,#e8eef6);border:1px solid var(--line,#2a3340);border-radius:6px;padding:0 4px;}'
+    '.sort-wrap{position:relative;display:inline-flex;align-items:center;gap:6px;margin-right:4px;}',
+    '.sort-wrap .sort-btn{height:22px;padding:0 8px;border:1px solid var(--line,#2a3340);border-radius:8px;background:var(--card-2,#1c2430);color:var(--text,#e8eef6);font-size:11px;cursor:pointer;}',
+    '.sort-wrap .sort-menu{position:absolute;right:0;bottom:calc(100% + 6px);display:none;min-width:140px;list-style:none;margin:0;padding:4px;background:var(--card,#1a2330);border:1px solid var(--line,#2a3340);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.35);z-index:30;}',
+    '.sort-wrap.open .sort-menu{display:block;}',
+    '.sort-wrap .sort-menu li{padding:7px 10px;border-radius:8px;cursor:pointer;font-size:11px;}',
+    '.sort-wrap .sort-menu li:hover,.sort-wrap .sort-menu li.active{background:var(--card-2,#243042);}'
   ].join('');
   document.head.appendChild(css);
 
   const tools = document.querySelector('.statusbar .tools');
   if (!tools) return;
+
   const wrap = document.createElement('span');
   wrap.className = 'sort-wrap';
-  wrap.innerHTML = '<label for="card-sort">Sort</label>';
-  const sel = document.createElement('select');
-  sel.id = 'card-sort';
-  OPTIONS.forEach(function (o) {
-    const opt = document.createElement('option');
-    opt.value = o.id;
-    opt.textContent = o.label;
-    if (o.id === mode) opt.selected = true;
-    sel.appendChild(opt);
+  wrap.innerHTML = '<button type="button" class="sort-btn">Sort: Name</button><ul class="sort-menu"></ul>';
+
+  const btn = wrap.querySelector('.sort-btn');
+  const menu = wrap.querySelector('.sort-menu');
+
+  OPTIONS.forEach(function (opt) {
+    const item = document.createElement('li');
+    item.textContent = opt.label;
+    item.dataset.value = opt.id;
+    if (opt.id === mode) item.classList.add('active');
+    item.addEventListener('click', function () {
+      mode = opt.id;
+      localStorage.setItem(KEY, mode);
+      btn.textContent = 'Sort: ' + opt.label;
+      menu.querySelectorAll('li').forEach(function (node) {
+        node.classList.toggle('active', node.dataset.value === mode);
+      });
+      wrap.classList.remove('open');
+      sortLanes();
+    });
+    menu.appendChild(item);
   });
-  wrap.appendChild(sel);
+
+  btn.textContent = 'Sort: ' + (OPTIONS.find(function (o) { return o.id === mode; }) || OPTIONS[0]).label;
+  btn.addEventListener('click', function (ev) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    wrap.classList.toggle('open');
+  });
+  document.addEventListener('click', function () {
+    wrap.classList.remove('open');
+  });
+
   tools.insertBefore(wrap, tools.firstChild);
 
   function findShow(card) {
@@ -49,22 +71,19 @@
     }
     return null;
   }
+
   function value(card) {
     const show = findShow(card) || {};
     const title = (show.title || (card.querySelector('h4') || {}).textContent || '').toLowerCase();
-    const total = show.episodes || 12;
-    const sub = typeof airedNow === 'function' ? airedNow(show, 'sub') : (show.subAired || 0);
     if (mode === 'air') {
-      const ev = show.focus || (show.nextEvents || [])[0];
-      if (ev && ev.ts) return ev.ts;
-      if (show.nextSubAt) return Date.parse(show.nextSubAt) || 0;
+      const first = show.focus || (show.nextEvents || [])[0];
+      if (first && first.ts) return Number(first.ts);
+      if (show.nextSubAt) return Date.parse(show.nextSubAt) || Number.MAX_SAFE_INTEGER;
       return Number.MAX_SAFE_INTEGER;
     }
-    if (mode === 'left') return Math.max(0, total - sub);
-    if (mode === 'progress') return sub / total;
-    if (mode === 'score') return -(show.averageScore || show.score || 0);
     return title;
   }
+
   function sortLanes() {
     document.querySelectorAll('.cards').forEach(function (box) {
       const kids = [].slice.call(box.querySelectorAll(':scope > [data-sid], :scope > .stack-card, :scope > .row-card'));
@@ -80,16 +99,11 @@
     });
   }
 
-  sel.addEventListener('change', function () {
-    mode = sel.value;
-    localStorage.setItem(KEY, mode);
-    sortLanes();
-  });
-
   const orig = window.renderBoard;
   window.renderBoard = function () {
     if (typeof orig === 'function') orig();
     sortLanes();
   };
+
   sortLanes();
 })();

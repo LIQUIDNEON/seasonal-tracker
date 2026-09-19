@@ -62,7 +62,10 @@ function applyTheme() {
   const grid = $("#picker-grid");
   grid.classList.toggle("tiles", pick === "tiles");
   grid.classList.toggle("rows", pick === "rows");
-  $("#combined-legend").hidden = state.settings.progressMode !== "combined";
+  const combinedLegend = $("#combined-legend");
+  if (combinedLegend) {
+    combinedLegend.hidden = state.settings.progressMode !== "combined";
+  }
 }
 
 function episodeTotal(show) {
@@ -232,6 +235,7 @@ function showMeta(show) {
 
 function renderRow(show) {
   const card = document.createElement("article");
+  card.dataset.sid = String(show.id);
   card.className = "row-card" + (state.settings.compact ? " compact" : "");
   card.innerHTML = `
     <img class="poster" src="${show.cover || ""}" alt="" />
@@ -254,6 +258,7 @@ function renderRow(show) {
 function renderStack(show) {
   const posterTop = state.settings.stackPoster === "top";
   const card = document.createElement("article");
+  card.dataset.sid = String(show.id);
   card.className = "stack-card" + (posterTop ? " poster-top" : "");
   const img = document.createElement("img");
   img.className = "poster";
@@ -490,16 +495,9 @@ function wireSelects() {
 function fillSettingsForm() {
   const form = $("#settings-form");
   const s = state.settings;
-  setSelectValue(form.querySelector('[data-name="layout"]'), s.layout || "rows");
-  setSelectValue(form.querySelector('[data-name="stackPoster"]'), s.stackPoster || "bottom");
   setSelectValue(form.querySelector('[data-name="theme"]'), s.theme || "dark");
   setSelectValue(form.querySelector('[data-name="titleLanguage"]'), s.titleLanguage || "english");
-  setSelectValue(form.querySelector('[data-name="progressMode"]'), s.progressMode || "split");
   setSelectValue(form.querySelector('[data-name="weekStart"]'), s.weekStart || "sunday");
-  form.showSub.checked = s.showSub !== false;
-  form.showDub.checked = s.showDub !== false;
-  form.compact.checked = !!s.compact;
-  $("#combined-legend").hidden = (s.progressMode || "split") !== "combined";
 }
 
 function wire() {
@@ -532,15 +530,9 @@ function wire() {
     ev.preventDefault();
     const form = ev.target;
     const payload = {
-      layout: form.layout.value,
-      stackPoster: form.stackPoster.value,
       theme: form.theme.value,
       titleLanguage: form.titleLanguage.value,
-      progressMode: form.progressMode.value,
       weekStart: form.weekStart.value,
-      showSub: form.showSub.checked,
-      showDub: form.showDub.checked,
-      compact: form.compact.checked,
     };
     state.settings = await api("/api/settings", { method: "POST", body: JSON.stringify(payload) });
     applyTheme();

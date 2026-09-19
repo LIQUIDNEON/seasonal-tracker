@@ -233,6 +233,12 @@ class Handler(SimpleHTTPRequestHandler):
 
         payload = self._library_payload()
         days: dict[str, list] = {}
+        current = start
+        while current < end:
+            key = current.strftime("%Y-%m-%d")
+            days[key] = []
+            current += timedelta(days=1)
+
         floating = []
         for show in payload["shows"]:
             hits = event_in_range(show.get("nextEvents") or [], start, end)

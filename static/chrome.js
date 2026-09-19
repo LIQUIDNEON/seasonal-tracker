@@ -122,61 +122,6 @@
     }
     return null;
   }
-  function weekBuckets() {
-    const now = new Date();
-    const wantSun = (state.settings.weekStart || 'sunday') !== 'monday';
-    const startWeekday = wantSun ? 0 : 1;
-    const daysSince = (now.getDay() - startWeekday + 7) % 7;
-    const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysSince);
-    const weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6);
-    const extra = state.range === 'next_week' ? 7 : state.range === 'week_after' ? 14 : 0;
-    const start = state.range === 'this_week'
-      ? new Date(now.getFullYear(), now.getMonth(), now.getDate())
-      : new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + extra);
-    const end = state.range === 'this_week'
-      ? new Date(weekEnd.getFullYear(), weekEnd.getMonth(), weekEnd.getDate())
-      : new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6);
-    const buckets = {};
-    for (let i = 0; i < 7; i += 1) {
-      const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
-      if (state.range === 'this_week' && d > end) break;
-      buckets[localKey(d)] = { date: localKey(d), label: d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' }), shows: [] };
-    }
-    return buckets;
-  }
-  function projectWeek(sched, library) {
-    const buckets = weekBuckets();
-    const used = new Set();
-    (sched.days || []).forEach(function (day) {
-      (day.shows || []).forEach(function (s) {
-        const dow = airDow(s);
-        const target = Object.values(buckets).find(function (b) {
-          return dow != null && new Date(b.date + 'T12:00:00').getDay() === dow;
-        }) || buckets[day.date];
-        if (!target) return;
-        if (target.shows.some(function (x) { return Number(x.id) === Number(s.id); })) return;
-        target.shows.push(s);
-        used.add(Number(s.id));
-      });
-    });
-    (library || []).forEach(function (show) {
-      if (used.has(Number(show.id))) return;
-      const dow = airDow(show);
-      if (dow == null) return;
-      Object.values(buckets).forEach(function (bucket) {
-        if (new Date(bucket.date + 'T12:00:00').getDay() !== dow) return;
-        if (bucket.shows.some(function (s) { return Number(s.id) === Number(show.id); })) return;
-        bucket.shows.push(show);
-      });
-    });
-    let days = Object.keys(buckets).sort().map(function (k) { return buckets[k]; });
-    if (state.range === 'this_week' && !isBar()) {
-      const today = localKey(new Date());
-      const idx = days.findIndex(function (d) { return d.date === today; });
-      if (idx > 0) days = days.slice(idx).concat(days.slice(0, idx));
-    }
-    return Object.assign({}, sched, { days: days });
-  }
   function pillTip(show, kind) {
     const total = show.episodes || 12;
     const aired = viewAired(show, kind);
@@ -265,9 +210,6 @@
   };
   const originalRenderBoard = window.renderBoard;
   window.renderBoard = function () {
-    if (typeof isWeekRange === 'function' && isWeekRange(state.range) && state.schedule) {
-      state.schedule = projectWeek(state.schedule, state.library || []);
-    }
     if (typeof originalRenderBoard === 'function') originalRenderBoard();
     document.body.classList.toggle('layout-bar', isBar());
     document.body.classList.toggle('layout-row', !isBar());
