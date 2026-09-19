@@ -1,4 +1,19 @@
 (function () {
+  const css = document.createElement('style');
+  css.textContent = [
+    'a.show-title,.stack-card.compact a{',
+    'color:inherit!important;text-decoration:none!important;',
+    'font-size:12px!important;font-weight:650!important;',
+    'display:-webkit-box!important;-webkit-line-clamp:2!important;',
+    '-webkit-box-orient:vertical!important;overflow:hidden!important;',
+    'height:2.6em!important;line-height:1.3!important;cursor:pointer!important;',
+    '}',
+    'a.show-title:hover,a.show-title:visited,.stack-card.compact a:hover{',
+    'color:inherit!important;text-decoration:none!important;',
+    '}'
+  ].join('');
+  document.head.appendChild(css);
+
   function fmtWhen(at) {
     if (typeof fmtTime === 'function') return fmtTime(at);
     const d = new Date(at);
@@ -56,30 +71,36 @@
     const tip = document.querySelector('#hover-tip');
     if (tip) tip.classList.add('hidden');
   }
+  function openNexus(title) {
+    const url = 'https://anime.nexus/series?search=' + encodeURIComponent(title || '');
+    fetch('/api/open', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: url })
+    }).catch(function () {
+      fetch('/api/open?url=' + encodeURIComponent(url)).catch(function () {});
+    });
+  }
   const orig = window.paintCard;
   if (typeof orig !== 'function') return;
   window.paintCard = function (show) {
     const card = orig(show);
-    const old = card.querySelector('h4, a.show-title');
-    if (!old) return card;
-    const url = 'https://anime.nexus/series?search=' + encodeURIComponent(show.title || '');
-    const a = document.createElement('a');
-    a.className = 'show-title';
-    a.href = url;
-    a.target = '_blank';
-    a.rel = 'noopener noreferrer';
-    a.textContent = show.title;
-    a.title = titleText(show);
-    old.replaceWith(a);
-    a.addEventListener('mouseenter', function () { placeTip(titleHtml(show), a); });
-    a.addEventListener('mouseleave', hideTip);
-    a.addEventListener('click', function (ev) {
+    let title = card.querySelector('h4, a.show-title');
+    if (!title) return card;
+    if (title.tagName === 'A') {
+      const h = document.createElement('h4');
+      h.textContent = show.title;
+      title.replaceWith(h);
+      title = h;
+    }
+    title.title = titleText(show);
+    title.style.cursor = 'pointer';
+    title.addEventListener('mouseenter', function () { placeTip(titleHtml(show), title); });
+    title.addEventListener('mouseleave', hideTip);
+    title.addEventListener('click', function (ev) {
+      ev.preventDefault();
       ev.stopPropagation();
-      fetch('/api/open', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: url })
-      }).catch(function () {});
+      openNexus(show.title);
     });
     return card;
   };
