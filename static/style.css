@@ -448,6 +448,44 @@ button.active:hover { background: var(--text); }
 }
 .toast.hidden { display: none; }
 
+.notify-btn { position: relative; }
+.notify-badge {
+  position: absolute; top: 2px; right: 2px; width: 8px; height: 8px;
+  background: #ff5d5d; border: 2px solid var(--bg); border-radius: 50%;
+}
+.notify-badge.hidden { display: none; }
+
+.notify-panel {
+  position: fixed; right: 12px; bottom: 40px; width: min(360px, calc(100vw - 24px));
+  max-height: min(48vh, 420px); background: var(--bg-2); border: 1px solid var(--line);
+  border-radius: 16px; box-shadow: 0 16px 28px rgba(0,0,0,0.35); z-index: 40;
+  overflow: hidden;
+}
+.notify-panel::before {
+  content: ""; position: absolute; right: 18px; bottom: -10px; width: 20px; height: 20px;
+  background: var(--bg-2); border-right: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  transform: rotate(45deg);
+}
+.notify-panel.hidden { display: none; }
+.notify-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 10px 12px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--bg-2) 86%, var(--card));
+}
+.notify-head h2 { margin: 0; font-size: 13px; }
+.notify-list { display: flex; flex-direction: column; gap: 8px; padding: 10px; overflow-y: auto; }
+.notify-item {
+  display: flex; flex-direction: column; gap: 5px; border: 1px solid var(--line);
+  border-radius: 12px; padding: 8px 10px; background: var(--card); color: var(--text);
+}
+.notify-item.error { border-color: rgba(255, 96, 96, 0.6); }
+.notify-item.warn { border-color: rgba(255, 191, 96, 0.6); }
+.notify-item.info { border-color: rgba(104, 173, 255, 0.6); }
+.notify-headline { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.notify-tag { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.75; }
+.notify-item time { font-size: 10px; opacity: 0.7; }
+.notify-item strong { font-size: 12px; line-height: 1.35; }
+.notify-item small { font-size: 11px; line-height: 1.4; opacity: 0.8; word-break: break-word; }
+
 .progress-btns { display: flex; gap: 4px; }
 .progress-btns button { padding: 2px 8px; font-size: 11px; line-height: 1.35; }
 

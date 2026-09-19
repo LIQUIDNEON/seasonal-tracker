@@ -8,12 +8,55 @@ const state = {
   pickerSeason: null,
   pickerYear: null,
   searchTimer: null,
+  notifications: [],
 };
 
 const $ = (sel) => document.querySelector(sel);
 const board = $("#board");
 
 const DAY_ACCENTS = ["#7ad0ff", "#8b7bff", "#3dd68c", "#f0c36a", "#ff8a5b", "#ff9aa2", "#5b8def"];
+
+function notify(type, title, detail = "") {
+  const item = {
+    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    type,
+    title,
+    detail,
+    time: new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
+  };
+  state.notifications = [item, ...state.notifications].slice(0, 20);
+  const list = $("#notify-list");
+  if (list) {
+    list.innerHTML = state.notifications
+      .map(
+        (n) => `
+          <div class="notify-item ${n.type}">
+            <div class="notify-headline">
+              <span class="notify-tag">${n.type === "error" ? "Error" : n.type === "warn" ? "Warn" : "Info"}</span>
+              <time>${n.time}</time>
+            </div>
+            <strong>${n.title}</strong>
+            ${n.detail ? `<small>${n.detail}</small>` : ""}
+          </div>
+        `,
+      )
+      .join("");
+  }
+  const panel = $("#notify-panel");
+  if (panel && !panel.classList.contains("hidden") && type === "error") {
+    panel.classList.remove("hidden");
+  }
+  const badge = $("#notify-badge");
+  if (badge) {
+    const hasError = state.notifications.some((n) => n.type === "error");
+    badge.classList.toggle("hidden", !hasError);
+  }
+}
+
+function reportError(err, context = "Request failed") {
+  const message = err && err.message ? err.message : String(err || "Unknown error");
+  notify("error", context, message);
+}
 
 function toast(msg) {
   const el = $("#toast");
@@ -22,15 +65,39 @@ function toast(msg) {
   setTimeout(() => el.classList.add("hidden"), 2200);
 }
 
-async function api(path, opts) {
-  const res = await fetch(path, {
+async function api(path, opts = {}) {
+  const req = {
     headers: { "Content-Type": "application/json" },
     ...opts,
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || res.statusText);
-  return data;
+  };
+
+  try {
+    const res = await fetch(path, req);
+    let data = {};
+    try {
+      data = await res.json();
+    } catch {
+      data = {};
+    }
+    if (!res.ok) {
+      const err = new Error(data.error || data.message || res.statusText || `HTTP ${res.status}`);
+      err.status = res.status;
+      err.__reported = true;
+      reportError(err, `Request failed: ${path}`);
+      throw err;
+    }
+    return data;
+  } catch (err) {
+    if (!err || err.__reported) throw err;
+    err.__reported = true;
+    reportError(err, `Request failed: ${path}`);
+    throw err;
+  }
 }
+
+window.api = api;
+window.reportError = reportError;
+window.notify = notify;
 
 function fmtTime(iso) {
   if (!iso) return "";
@@ -501,6 +568,21 @@ function fillSettingsForm() {
 }
 
 function wire() {
+  const notifyPanel = $("#notify-panel");
+  const notifyClose = $("#notify-close");
+  const notifyButton = $("#btn-notifications");
+
+  if (notifyButton) {
+    notifyButton.addEventListener("click", () => {
+      if (!notifyPanel) return;
+      notifyPanel.classList.toggle("hidden");
+    });
+  }
+
+  if (notifyClose) {
+    notifyClose.addEventListener("click", () => notifyPanel && notifyPanel.classList.add("hidden"));
+  }
+
   wireSelects();
   document.querySelectorAll("#ranges button").forEach((btn) => {
     btn.addEventListener("click", () => {

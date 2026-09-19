@@ -40,15 +40,21 @@
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: show.id, nexusUrl: url || '' })
-    }).catch(function () {});
+    }).catch(function (err) {
+      if (window.reportError) window.reportError(err, 'Save library progress failed');
+      else console.error(err);
+    });
   }
   function openNexus(url) {
     fetch('/api/open', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url: url })
-    }).catch(function () {
-      fetch('/api/open?url=' + encodeURIComponent(url)).catch(function () {});
+    }).catch(function (err) {
+      if (window.reportError) window.reportError(err, 'Open link failed');
+      fetch('/api/open?url=' + encodeURIComponent(url)).catch(function (fallbackErr) {
+        if (window.reportError) window.reportError(fallbackErr, 'Open link fallback failed');
+      });
     });
   }
   function insideWidget(el) {

@@ -26,6 +26,10 @@
         </button>
         <button type="button" id="btn-float" class="icon-btn" title="Float">⧉</button>
         <button type="button" id="btn-settings" class="icon-btn" title="Settings">⚙</button>
+        <button type="button" id="btn-notifications" class="icon-btn notify-btn" title="Notifications">
+          🔔
+          <span id="notify-badge" class="notify-badge hidden" aria-hidden="true"></span>
+        </button>
       </div>
     </footer>
   </div>
@@ -49,6 +53,13 @@
       <button type="submit" class="primary">Save</button>
       <div class="reload-row"><button type="button" id="btn-reload-ui">Reload UI</button><button type="button" id="btn-reload-widget" class="primary">Reload widget</button></div>
     </form>
+  </aside>
+  <aside id="notify-panel" class="notify-panel hidden" aria-live="polite">
+    <div class="notify-head">
+      <h2>Notifications</h2>
+      <button type="button" id="notify-close">Close</button>
+    </div>
+    <div id="notify-list" class="notify-list"></div>
   </aside>
   <div hidden><span id="range-label"></span><span id="season-chip"></span></div>
   <div id="toast" class="toast hidden"></div>

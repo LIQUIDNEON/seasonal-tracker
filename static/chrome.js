@@ -223,7 +223,10 @@
   if (reloadUi) reloadUi.addEventListener('click', bustReload);
   const reloadAll = document.querySelector('#btn-reload-widget');
   if (reloadAll) reloadAll.addEventListener('click', function () {
-    fetch('/api/reload', { method: 'POST', body: '{}' }).catch(function () {});
+    fetch('/api/reload', { method: 'POST', body: '{}' }).catch(function (err) {
+      if (window.reportError) window.reportError(err, 'Reload request failed');
+      else console.error(err);
+    });
     setTimeout(bustReload, 900);
   });
 })();
