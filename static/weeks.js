@@ -1,10 +1,7 @@
 (function () {
-  const WEEKS = [
-    { range: 'this_week', name: 'This week' },
-    { range: 'next_week', name: 'Next week' },
-    { range: 'week_after', name: 'Following' }
-  ];
-  let offset = 0;
+  const NAMES = ['This week', 'Next week', 'Following'];
+  let offset = Number(state.weekOffset || 0);
+  let layoutBeforeLibrary = null;
 
   const css = document.createElement('style');
   css.textContent = [
@@ -31,8 +28,25 @@
     '<button type="button" data-range="library">My shows</button>';
 
   function isWeek() {
-    return state.range === 'this_week' || state.range === 'next_week' || state.range === 'week_after';
+    return state.range === 'this_week' || state.range === 'next_week' || state.range === 'week_after' || state.range === 'week';
   }
+  window.isWeekRange = function (range) {
+    return range === 'this_week' || range === 'next_week' || range === 'week_after' || range === 'week';
+  };
+
+  function weekStartDate(off) {
+    const wantSun = (state.settings.weekStart || 'sunday') !== 'monday';
+    const now = new Date();
+    const startWeekday = wantSun ? 0 : 1;
+    const daysSince = (now.getDay() - startWeekday + 7) % 7;
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysSince);
+    start.setDate(start.getDate() + off * 7);
+    return start;
+  }
+  function localKey(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
   function paintActive() {
     nav.querySelectorAll('button').forEach(function (b) { b.classList.remove('active'); });
     const today = document.querySelector('#btn-today');
@@ -46,42 +60,126 @@
     if (pager) pager.classList.toggle('is-on', isWeek());
     if (label) {
       if (isWeek() && state.schedule && state.schedule.label) label.textContent = state.schedule.label;
-      else label.textContent = WEEKS[offset].name;
+      else label.textContent = NAMES[offset] || ('+' + offset + ' wk');
     }
     const prev = document.querySelector('#week-prev');
-    const next = document.querySelector('#week-next');
-    if (prev) prev.disabled = offset <= 0;
-    if (next) next.disabled = offset >= WEEKS.length - 1;
+    if (prev) prev.disabled = isWeek() && offset <= 0;
   }
-  function go(range) {
-    state.range = range;
-    if (range === 'this_week') offset = 0;
-    if (range === 'next_week') offset = 1;
-    if (range === 'week_after') offset = 2;
+
+  function applyLibraryLayout() {
+    if (state.range === 'library') {
+      if (layoutBeforeLibrary == null) layoutBeforeLibrary = state.settings.layout;
+      state.settings.layout = 'stacks';
+    } else if (layoutBeforeLibrary != null) {
+      state.settings.layout = layoutBeforeLibrary;
+      layoutBeforeLibrary = null;
+    }
+    if (typeof applyTheme === 'function') applyTheme();
+  }
+
+  function reseat() {
+    const strip = document.querySelector('.week-strip');
+    if (!strip || !isWeek()) return;
+    const cols = [].slice.call(strip.querySelectorAll('.day-col'));
+    if (!cols.length) return;
+    const start = weekStartDate(offset);
+    const byDow = {};
+    cols.forEach(function (col, i) {
+      const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+      col.dataset.date = localKey(d);
+      byDow[d.getDay()] = col;
+    });
+    const lib = state.library || [];
+    cols.forEach(function (col) {
+      [].slice.call(col.querySelectorAll('[data-sid]')).forEach(function (card) {
+        const show = lib.find(function (s) { return String(s.id) === String(card.dataset.sid); });
+        if (!show || show.airDow == null || show.airDow === '') return;
+        const destCol = byDow[Number(show.airDow)];
+        const dest = destCol && destCol.querySelector('.cards');
+        if (dest && card.parentNode !== dest) dest.appendChild(card);
+      });
+    });
+    cols.forEach(function (col) {
+      const box = col.querySelector('.cards');
+      if (!box) return;
+      const kids = [].slice.call(box.children);
+      kids.sort(function (a, b) { return Number(a.dataset.sid) - Number(b.dataset.sid); });
+      kids.forEach(function (k) { box.appendChild(k); });
+    });
+    if (offset === 0) {
+      const today = localKey(new Date());
+      const idx = cols.findIndex(function (c) { return c.dataset.date === today; });
+      if (idx > 0) {
+        const head = cols.slice(idx);
+        const tail = cols.slice(0, idx);
+        head.concat(tail).forEach(function (c) { strip.appendChild(c); });
+      }
+    }
+  }
+
+  async function loadWeek() {
+    state.weekOffset = offset;
+    state.range = offset === 0 ? 'this_week' : offset === 1 ? 'next_week' : offset === 2 ? 'week_after' : 'this_week';
+    applyLibraryLayout();
     paintActive();
-    loadSchedule().then(paintActive).catch(function (e) {
+    try {
+      const [sched, lib] = await Promise.all([
+        api('/api/schedule?range=this_week&offset=' + offset),
+        api('/api/library')
+      ]);
+      state.schedule = sched;
+      state.library = lib.shows || [];
+      renderBoard();
+    } catch (e) {
       if (typeof toast === 'function') toast(e.message);
+    }
+    paintActive();
+    reseat();
+  }
+
+  function goToday() {
+    state.range = 'today';
+    applyLibraryLayout();
+    paintActive();
+    loadSchedule().then(paintActive);
+  }
+  function goLibrary() {
+    state.range = 'library';
+    applyLibraryLayout();
+    paintActive();
+    loadSchedule().then(function () {
+      paintActive();
+      if (typeof applyTheme === 'function') applyTheme();
+      renderBoard();
     });
   }
 
-  document.querySelector('#btn-today').addEventListener('click', function () { go('today'); });
-  nav.querySelector('[data-range="library"]').addEventListener('click', function () { go('library'); });
-  document.querySelector('#week-now').addEventListener('click', function () { go('this_week'); });
+  document.querySelector('#btn-today').addEventListener('click', goToday);
+  nav.querySelector('[data-range="library"]').addEventListener('click', goLibrary);
+  document.querySelector('#week-now').addEventListener('click', function () {
+    offset = 0;
+    loadWeek();
+  });
   document.querySelector('#week-prev').addEventListener('click', function () {
     if (offset <= 0) return;
     offset -= 1;
-    go(WEEKS[offset].range);
+    loadWeek();
   });
   document.querySelector('#week-next').addEventListener('click', function () {
-    if (offset >= WEEKS.length - 1) return;
     offset += 1;
-    go(WEEKS[offset].range);
+    loadWeek();
   });
 
-  const orig = window.renderBoard;
+  const origRender = window.renderBoard;
   window.renderBoard = function () {
-    if (typeof orig === 'function') orig();
+    if (typeof origRender === 'function') origRender();
+    if (state.range === 'library') {
+      document.body.classList.add('layout-bar');
+      document.body.classList.remove('layout-row');
+    }
+    reseat();
     paintActive();
   };
+
   paintActive();
 })();
