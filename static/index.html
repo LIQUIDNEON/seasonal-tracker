@@ -4,27 +4,30 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Seasonal Tracker</title>
-  <link rel="stylesheet" href="/style.css?v=bar3" />
-  <link rel="stylesheet" href="/compact.css?v=bar3" />
+  <link rel="stylesheet" href="/style.css?v=bar4" />
+  <link rel="stylesheet" href="/compact.css?v=bar4" />
   <style>
-    .statusbar {
-      display: flex !important;
-      flex-direction: row !important;
-      flex-wrap: nowrap !important;
-      align-items: center !important;
-      justify-content: space-between !important;
-      height: 32px !important;
-      max-height: 32px !important;
-      overflow: hidden !important;
-    }
-    .statusbar .ranges { margin-right: auto !important; flex-wrap: nowrap !important; }
-    .statusbar .tools { margin-left: auto !important; flex-wrap: nowrap !important; }
-    #range-label, #season-chip, .bar-label, .season-chip, .statusline, #btn-minimal { display: none !important; }
-    #btn-layout { font-size: 0 !important; width: 26px !important; min-width: 26px !important; overflow: hidden !important; }
-    .week-strip.week-rows { flex-direction: column !important; width: 100% !important; }
-    .week-strip.week-rows .day-col { width: 100% !important; overflow: visible !important; }
-    .week-strip.week-rows .cards.rows { flex-direction: row !important; flex-wrap: wrap !important; width: 100% !important; }
-    .row-card .counts { display: none !important; }
+    .statusbar { display:flex !important; flex-wrap:nowrap !important; align-items:center !important; justify-content:space-between !important; height:32px !important; max-height:32px !important; overflow:hidden !important; }
+    .statusbar .ranges { margin-right:auto !important; flex-wrap:nowrap !important; }
+    .statusbar .tools { margin-left:auto !important; }
+    .statusbar .ranges button { padding:2px 8px !important; font-size:11px !important; }
+    #range-label,#season-chip,.bar-label,.season-chip,.statusline,#btn-minimal,#btn-compact,.poster-flip { display:none !important; }
+    #btn-layout { font-size:0 !important; width:26px !important; overflow:hidden !important; }
+    #btn-layout .i-bar { display:none; fill:currentColor; }
+    #btn-layout .i-row { display:block; fill:currentColor; }
+    #btn-layout.is-bar .i-row { display:none; }
+    #btn-layout.is-bar .i-bar { display:block; }
+    .week-strip { width:100% !important; max-width:100% !important; }
+    .week-strip:not(.week-rows) { display:flex !important; flex-direction:row !important; align-items:stretch !important; }
+    .week-strip:not(.week-rows) .day-col { flex:1 1 0 !important; min-width:128px !important; width:auto !important; overflow:visible !important; }
+    .week-strip:not(.week-rows) .cards { display:flex !important; flex-wrap:wrap !important; width:100% !important; }
+    .week-strip.week-rows { flex-direction:column !important; width:100% !important; }
+    .week-strip.week-rows .day-col { width:100% !important; }
+    .week-strip.week-rows .cards { flex-direction:row !important; flex-wrap:wrap !important; width:100% !important; }
+    .row-card.compact,.stack-card.compact { width:140px !important; min-width:140px !important; max-width:160px !important; flex:1 1 140px !important; }
+    .row-card.compact h4,.stack-card.compact h4,.stack-card h4 { display:-webkit-box !important; -webkit-line-clamp:3 !important; -webkit-box-orient:vertical !important; overflow:hidden !important; height:3.9em !important; }
+    .day-col .cards:empty { min-height:48px; opacity:.45; }
+    .row-card .counts,.stack-card .counts { display:none !important; }
   </style>
 </head>
 <body>
@@ -39,10 +42,10 @@
         <button type="button" data-range="library">My shows</button>
       </nav>
       <div class="tools">
-        <button type="button" id="btn-compact" class="icon-btn" title="Compact">▣</button>
-        <button type="button" id="btn-layout" class="icon-btn" title="Rows / Stacks">
-          <svg class="i-rows" viewBox="0 0 20 20" width="16" height="16"><rect x="1" y="1" width="8" height="8" rx="1.5"/><rect x="11" y="1" width="8" height="8" rx="1.5"/><rect x="1" y="11" width="8" height="8" rx="1.5"/><rect x="11" y="11" width="8" height="8" rx="1.5"/></svg>
-          <svg class="i-stacks" viewBox="0 0 20 20" width="16" height="16"><rect x="1" y="6" width="5" height="13" rx="1.2"/><rect x="7.5" y="1" width="5" height="18" rx="1.2"/><rect x="14" y="4" width="5" height="15" rx="1.2"/></svg>
+        <button type="button" id="btn-compact" hidden></button>
+        <button type="button" id="btn-layout" class="icon-btn" title="Bar / Row">
+          <svg class="i-row" viewBox="0 0 20 20" width="16" height="16"><rect x="1" y="3" width="18" height="3" rx="1"/><rect x="1" y="8.5" width="18" height="3" rx="1"/><rect x="1" y="14" width="18" height="3" rx="1"/></svg>
+          <svg class="i-bar" viewBox="0 0 20 20" width="16" height="16"><rect x="3" y="1" width="3" height="18" rx="1"/><rect x="8.5" y="1" width="3" height="18" rx="1"/><rect x="14" y="1" width="3" height="18" rx="1"/></svg>
         </button>
         <button type="button" id="btn-float" class="icon-btn" title="Float">⧉</button>
         <button type="button" id="btn-settings" class="icon-btn" title="Settings">⚙</button>
@@ -54,37 +57,25 @@
     <div class="picker-bar">
       <select id="season-select"></select>
       <input id="search" type="search" placeholder="Search titles…" />
-      <div class="seg" id="picker-layout">
-        <button type="button" data-pick="tiles" class="active">Tiles</button>
-        <button type="button" data-pick="rows">Rows</button>
-      </div>
+      <div class="seg" id="picker-layout"><button type="button" data-pick="tiles" class="active">Tiles</button><button type="button" data-pick="rows">Rows</button></div>
     </div>
     <div id="picker-grid" class="picker-grid tiles"></div>
-    <div class="pager">
-      <button type="button" id="page-prev">Prev</button>
-      <span id="page-info"></span>
-      <button type="button" id="page-next">Next</button>
-    </div>
+    <div class="pager"><button type="button" id="page-prev">Prev</button><span id="page-info"></span><button type="button" id="page-next">Next</button></div>
   </aside>
   <aside id="settings" class="drawer drawer-settings hidden">
     <div class="drawer-head"><h2>Widget settings</h2><button type="button" id="settings-close">Close</button></div>
     <form id="settings-form" class="settings-form">
       <button type="button" id="btn-add" class="primary">Add shows</button>
-      <label>Layout<div class="select" data-name="layout"><button type="button" class="select-btn"></button><ul class="select-menu"><li data-value="rows">Horizontal rows</li><li data-value="stacks">Vertical stacks</li></ul><input type="hidden" name="layout" /></div></label>
-      <label>Stack poster<div class="select" data-name="stackPoster"><button type="button" class="select-btn"></button><ul class="select-menu"><li data-value="bottom">Poster at bottom</li><li data-value="top">Poster at top</li></ul><input type="hidden" name="stackPoster" /></div></label>
+      <label>Layout<div class="select" data-name="layout"><button type="button" class="select-btn"></button><ul class="select-menu"><li data-value="stacks">Bar — days across</li><li data-value="rows">Row — days down</li></ul><input type="hidden" name="layout" /></div></label>
       <label>Theme<div class="select" data-name="theme"><button type="button" class="select-btn"></button><ul class="select-menu"><li data-value="dark">Dark widget</li><li data-value="light">Light</li></ul><input type="hidden" name="theme" /></div></label>
       <label>Title language<div class="select" data-name="titleLanguage"><button type="button" class="select-btn"></button><ul class="select-menu"><li data-value="english">English</li><li data-value="romaji">Romaji</li></ul><input type="hidden" name="titleLanguage" /></div></label>
       <label>Episode tracks<div class="select" data-name="progressMode"><button type="button" class="select-btn"></button><ul class="select-menu"><li data-value="split">Separate SUB and DUB rows</li><li data-value="combined">Combined row</li></ul><input type="hidden" name="progressMode" /></div></label>
       <div class="legend" id="combined-legend"><span class="swatch unaired"></span> Unaired <span class="swatch sub-aired"></span> Sub aired <span class="swatch dub-aired"></span> Dub aired <span class="swatch watched"></span> Watched</div>
       <label class="check"><input type="checkbox" name="showSub" /> Show sub counts</label>
       <label class="check"><input type="checkbox" name="showDub" /> Show English dub counts</label>
-      <label class="check"><input type="checkbox" name="compact" /> Compact cards</label>
       <label>Week starts<div class="select" data-name="weekStart"><button type="button" class="select-btn"></button><ul class="select-menu"><li data-value="sunday">Sunday</li><li data-value="monday">Monday</li></ul><input type="hidden" name="weekStart" /></div></label>
       <button type="submit" class="primary">Save</button>
-      <div class="reload-row">
-        <button type="button" id="btn-reload-ui">Reload UI</button>
-        <button type="button" id="btn-reload-widget" class="primary">Reload widget</button>
-      </div>
+      <div class="reload-row"><button type="button" id="btn-reload-ui">Reload UI</button><button type="button" id="btn-reload-widget" class="primary">Reload widget</button></div>
     </form>
   </aside>
   <div hidden><span id="range-label"></span><span id="season-chip"></span></div>
