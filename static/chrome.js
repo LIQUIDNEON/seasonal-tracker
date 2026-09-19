@@ -1,4 +1,4 @@
-/* Extra HUD: minimal mode + on-screen stack poster flip.
+/* Extra HUD: minimal mode, stack poster flip, widget reload.
  * Loaded after app.js so it can wrap applyTheme and reuse state/api. */
 (function () {
   const originalApply = window.applyTheme;
@@ -24,6 +24,26 @@
     });
   }
 
+  function bustReload() {
+    const u = new URL(window.location.href);
+    u.searchParams.set("_", String(Date.now()));
+    window.location.replace(u.toString());
+  }
+
+  async function reloadWidget() {
+    try {
+      await api("/api/reload", { method: "POST", body: "{}" });
+    } catch {
+      /* process may die before the response arrives — that is the point */
+    }
+    setTimeout(bustReload, 900);
+  }
+
+  const reloadUi = document.querySelector("#btn-reload-ui");
+  if (reloadUi) reloadUi.addEventListener("click", bustReload);
+  const reloadAll = document.querySelector("#btn-reload-widget");
+  if (reloadAll) reloadAll.addEventListener("click", reloadWidget);
+
   const mini = document.querySelector("#btn-minimal");
   if (mini) {
     mini.addEventListener("click", async () => {
@@ -31,7 +51,7 @@
       try {
         state.settings = await api("/api/settings", { method: "POST", body: JSON.stringify({ minimal: next }) });
       } catch {
-        /* ignore: key may not be in an older DEFAULT_SETTINGS yet */
+        state.settings.minimal = next;
       }
       state.settings.minimal = next;
       applyTheme();

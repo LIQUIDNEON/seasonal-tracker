@@ -8,8 +8,8 @@ Wants=network-online.target
 Type=simple
 WorkingDirectory=@REPO@
 ExecStart=/usr/bin/python3 @REPO@/widget.py --no-browser
-Restart=on-failure
-RestartSec=3
+Restart=always
+RestartSec=2
 Environment=SEASONAL_TRACKER_HOST=127.0.0.1
 Environment=SEASONAL_TRACKER_PORT=8765
 # Library and settings stay in ~/.config/seasonal-tracker regardless of repo path.
