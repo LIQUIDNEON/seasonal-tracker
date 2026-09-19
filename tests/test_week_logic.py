@@ -118,3 +118,69 @@ def test_library_title_jap_comes_from_romaji(monkeypatch, tmp_path) -> None:
         ).fetchone()
 
     assert row == ("English Title", "Romaji Title")
+
+
+def test_populate_weekly_schedule_filters_to_saved_library(monkeypatch, tmp_path) -> None:
+    import sqlite3
+
+    import tracker_lib
+
+    monkeypatch.setattr(tracker_lib, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(tracker_lib, "LIBRARY_PATH", tmp_path / "library.json")
+    monkeypatch.setattr(tracker_lib, "SETTINGS_PATH", tmp_path / "settings.json")
+    monkeypatch.setattr(tracker_lib, "CACHE_DIR", tmp_path / "cache")
+    monkeypatch.setattr(tracker_lib, "DB_PATH", tmp_path / "tracker.db")
+
+    tracker_lib.ensure_database()
+    tracker_lib.db_add_library_show({"id": 42, "title": "Saved Show", "titles": {"romaji": "Saved Show"}})
+    tracker_lib.db_add_library_show({"id": 99, "title": "Other Show", "titles": {"romaji": "Other Show"}})
+
+    monkeypatch.setattr(
+        tracker_lib.HUB,
+        "sub_schedule",
+        lambda: [
+            {"id": 42, "title": {"english": "Saved Show"}, "airingSchedule": {"nodes": [{"episode": 1, "airingAt": 1750000000}]}},
+            {"id": 99, "title": {"english": "Other Show"}, "airingSchedule": {"nodes": [{"episode": 2, "airingAt": 1750000000}]}} ,
+        ],
+    )
+
+    inserted = tracker_lib.populate_weekly_schedule(2025, 9, source="sub")
+    assert inserted == 1
+
+    with sqlite3.connect(tracker_lib.DB_PATH) as conn:
+        rows = conn.execute("SELECT anime_id FROM weekly_schedule").fetchall()
+    assert rows == [(42,)]
+
+
+def test_populate_weekly_schedule_creates_placeholder_for_missing_source_row(monkeypatch, tmp_path) -> None:
+    import sqlite3
+
+    import tracker_lib
+
+    monkeypatch.setattr(tracker_lib, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(tracker_lib, "LIBRARY_PATH", tmp_path / "library.json")
+    monkeypatch.setattr(tracker_lib, "SETTINGS_PATH", tmp_path / "settings.json")
+    monkeypatch.setattr(tracker_lib, "CACHE_DIR", tmp_path / "cache")
+    monkeypatch.setattr(tracker_lib, "DB_PATH", tmp_path / "tracker.db")
+
+    tracker_lib.ensure_database()
+    tracker_lib.db_add_library_show({"id": 42, "title": "Saved Show", "titles": {"romaji": "Saved Show"}})
+    tracker_lib.db_add_library_show({"id": 99, "title": "Missing Show", "titles": {"romaji": "Missing Show"}})
+
+    monkeypatch.setattr(
+        tracker_lib.HUB,
+        "sub_schedule",
+        lambda: [
+            {"id": 42, "title": {"english": "Saved Show"}, "airingSchedule": {"nodes": [{"episode": 1, "airingAt": 1757776000}]}}
+        ],
+    )
+
+    inserted = tracker_lib.populate_weekly_schedule(2025, 9, source="sub")
+    assert inserted == 2
+
+    with sqlite3.connect(tracker_lib.DB_PATH) as conn:
+        rows = conn.execute(
+            "SELECT anime_id, anime_title, source, air_date FROM weekly_schedule ORDER BY anime_id"
+        ).fetchall()
+    assert (42, "Saved Show", "sub", "2025-09-13") in rows
+    assert (99, "Missing Show", "missing", "2025-09-13") in rows

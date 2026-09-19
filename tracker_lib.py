@@ -361,10 +361,18 @@ def week_number_for_month(day: datetime.date) -> int:
     return ((day.day - 1) // 7) + 1
 
 
+def db_library_ids() -> set[int]:
+    ensure_database()
+    with sqlite3.connect(DB_PATH) as conn:
+        rows = conn.execute("SELECT id FROM library").fetchall()
+    return {int(row[0]) for row in rows}
+
+
 def populate_weekly_schedule(year: int, month: int, source: str = "sub") -> int:
     ensure_database()
     now_ts = int(time.time())
     raw_records = HUB.sub_schedule() if source == "sub" else HUB.dub_schedule()
+    library_ids = db_library_ids()
     records: list[dict] = []
     for item in raw_records:
         if not isinstance(item, dict):
@@ -376,17 +384,15 @@ def populate_weekly_schedule(year: int, month: int, source: str = "sub") -> int:
             anime_id = int(anime_id_raw)
         except (TypeError, ValueError):
             continue
-        details = HUB.media_details(anime_id)
-        media = ((details.get("data") or {}).get("Media")) or {}
-        schedule = media.get("airingSchedule") or {}
-        nodes = (schedule.get("nodes") or [])
-        if nodes:
-            item = dict(item)
-            item["airingSchedule"] = schedule
+        if library_ids and anime_id not in library_ids:
+            continue
         records.append(item)
 
     inserted = 0
+    last_seen_air_ts_by_anime: dict[int, datetime] = {}
+    last_seen_episode_by_anime: dict[int, int] = {}
     with sqlite3.connect(DB_PATH) as conn:
+        seen_ids: set[int] = set()
         for item in records:
             if not isinstance(item, dict):
                 continue
@@ -405,19 +411,25 @@ def populate_weekly_schedule(year: int, month: int, source: str = "sub") -> int:
                 when = parse_airing(node.get("airingAt"))
                 if when is None:
                     continue
-                dt = when.astimezone(timezone.utc).date()
-                if dt.year != year or dt.month != month:
+                dt = when.astimezone(timezone.utc)
+                if anime_id not in last_seen_air_ts_by_anime or dt > last_seen_air_ts_by_anime[anime_id]:
+                    last_seen_air_ts_by_anime[anime_id] = dt
+                ep_num = int(node.get("episode") or 0)
+                if ep_num > 0 and (anime_id not in last_seen_episode_by_anime or ep_num > last_seen_episode_by_anime[anime_id]):
+                    last_seen_episode_by_anime[anime_id] = ep_num
+                if dt.date().year != year or dt.date().month != month:
                     continue
-                week_num = week_number_for_month(dt)
+                seen_ids.add(anime_id)
+                week_num = week_number_for_month(dt.date())
                 row = {
                     "year": year,
                     "month": month,
                     "week_num": week_num,
                     "anime_id": anime_id,
                     "anime_title": title,
-                    "episode": int(node.get("episode") or 0),
+                    "episode": ep_num,
                     "air_day": dt.strftime("%A"),
-                    "air_date": dt.isoformat(),
+                    "air_date": dt.date().isoformat(),
                     "air_ts": int(when.timestamp()),
                     "source": source,
                     "fetched_at": now_ts,
@@ -443,6 +455,61 @@ def populate_weekly_schedule(year: int, month: int, source: str = "sub") -> int:
                     row,
                 )
                 inserted += 1
+
+        missing_ids = sorted(library_ids - seen_ids)
+        for anime_id in missing_ids:
+            title_row = conn.execute(
+                "SELECT title, title_jap, next_sub_episode FROM library WHERE id = ?",
+                (anime_id,),
+            ).fetchone()
+            title = (title_row[0] if title_row else None) or (title_row[1] if title_row else None) or str(anime_id)
+            next_ep = 0
+            if title_row and title_row[2] is not None:
+                try:
+                    next_ep = int(title_row[2])
+                except (TypeError, ValueError):
+                    next_ep = 0
+            last_known_ep = last_seen_episode_by_anime.get(anime_id, 0)
+            placeholder_episode = max(next_ep, last_known_ep + 1 if last_known_ep else 0, 1)
+            placeholder_dt = last_seen_air_ts_by_anime.get(anime_id)
+            if placeholder_dt is None:
+                placeholder_dt = datetime(year, month, 1, tzinfo=timezone.utc)
+            placeholder_date = placeholder_dt.astimezone(timezone.utc).date()
+            placeholder_ts = int(datetime.combine(placeholder_date, datetime.min.time(), tzinfo=timezone.utc).timestamp())
+            placeholder_row = {
+                "year": year,
+                "month": month,
+                "week_num": week_number_for_month(placeholder_date),
+                "anime_id": anime_id,
+                "anime_title": title,
+                "episode": placeholder_episode,
+                "air_day": placeholder_date.strftime("%A"),
+                "air_date": placeholder_date.isoformat(),
+                "air_ts": placeholder_ts,
+                "source": "missing",
+                "fetched_at": now_ts,
+            }
+            conn.execute(
+                """
+                INSERT INTO weekly_schedule (
+                    year, month, week_num, anime_id, anime_title,
+                    episode, air_day, air_date, air_ts, source, fetched_at
+                ) VALUES (
+                    :year, :month, :week_num, :anime_id, :anime_title,
+                    :episode, :air_day, :air_date, :air_ts, :source, :fetched_at
+                )
+                ON CONFLICT(year, month, week_num, anime_id, episode)
+                DO UPDATE SET
+                    anime_title = excluded.anime_title,
+                    air_day = excluded.air_day,
+                    air_date = excluded.air_date,
+                    air_ts = excluded.air_ts,
+                    source = excluded.source,
+                    fetched_at = excluded.fetched_at
+                """,
+                placeholder_row,
+            )
+            inserted += 1
         conn.commit()
     return inserted
 
