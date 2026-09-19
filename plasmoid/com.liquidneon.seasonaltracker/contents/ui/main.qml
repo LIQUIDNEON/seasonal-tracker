@@ -3,15 +3,13 @@ import QtQuick.Layouts
 import QtWebEngine
 import org.kde.kirigami as Kirigami
 import org.kde.plasma.components as PlasmaComponents
+import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.plasmoid
 
-/*
- * Plasma 6 desktop face for Seasonal Tracker.
- * Thin Qt WebEngine wrapper around widget.py on 127.0.0.1.
- */
 PlasmoidItem {
     id: root
 
+    Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
     preferredRepresentation: fullRepresentation
     switchWidth: Kirigami.Units.gridUnit * 14
     switchHeight: Kirigami.Units.gridUnit * 12
@@ -35,7 +33,7 @@ PlasmoidItem {
             id: view
             anchors.fill: parent
             url: face.backendUrl
-            backgroundColor: "#0e1116"
+            backgroundColor: "transparent"
 
             onNavigationRequested: function(request) {
                 const target = request.url.toString()
