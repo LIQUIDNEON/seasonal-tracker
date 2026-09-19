@@ -1,0 +1,18 @@
+[Unit]
+Description=Seasonal Tracker local backend
+Documentation=https://github.com/LIQUIDNEON/seasonal-tracker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=@REPO@
+ExecStart=/usr/bin/python3 @REPO@/widget.py --no-browser
+Restart=on-failure
+RestartSec=3
+Environment=SEASONAL_TRACKER_HOST=127.0.0.1
+Environment=SEASONAL_TRACKER_PORT=8765
+# Library and settings stay in ~/.config/seasonal-tracker regardless of repo path.
+
+[Install]
+WantedBy=default.target
