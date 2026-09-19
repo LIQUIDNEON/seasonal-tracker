@@ -1,0 +1,75 @@
+/* Compact tiles, finished border, and widget-width flex. */
+
+.cards.rows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: stretch;
+  width: 100%;
+  max-width: 100%;
+}
+.week-strip .cards.rows {
+  width: min(100%, 28rem);
+  max-width: 28rem;
+}
+
+.row-card {
+  flex: 1 1 220px;
+  width: auto;
+  min-width: min(220px, 100%);
+  max-width: 100%;
+  grid-template-columns: 48px minmax(0, 1fr);
+}
+.row-card.compact {
+  grid-template-columns: 52px minmax(0, 1fr);
+  flex-basis: 160px;
+  padding: 6px;
+}
+
+.stack-card.compact {
+  width: clamp(96px, 18vw, 140px);
+  flex-basis: auto;
+}
+
+.row-card.finished,
+.stack-card.finished {
+  border: 2px solid var(--aired);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--aired) 35%, transparent);
+}
+
+.remain-tiles {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.remain-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 52px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  line-height: 1.15;
+}
+.remain-tile b { font-size: 16px; font-weight: 750; }
+.remain-tile small {
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+.remain-tile.sub {
+  background: color-mix(in srgb, var(--sub) 22%, var(--card-2));
+  color: var(--sub);
+}
+.remain-tile.dub {
+  background: color-mix(in srgb, var(--dub) 22%, var(--card-2));
+  color: var(--dub);
+}
+.remain-tile.done {
+  background: color-mix(in srgb, var(--aired) 22%, var(--card-2));
+  color: var(--aired);
+}
+
+body.compact .progress-btns { display: none; }
