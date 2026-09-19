@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Seasonal Tracker</title>
   <link rel="stylesheet" href="/style.css" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📺</text></svg>" />
 </head>
 <body>
   <div id="app">
@@ -31,16 +30,13 @@
         <button type="button" id="btn-settings" title="Settings">⚙</button>
       </div>
     </header>
-
     <section class="statusline">
       <span id="range-label">Loading…</span>
       <span id="status-note"></span>
     </section>
-
     <main id="board" class="board"></main>
   </div>
   <button type="button" id="btn-minimal" class="fab" title="Minimal mode — hide chrome and scrollbars">▣</button>
-
   <aside id="drawer" class="drawer drawer-picker hidden">
     <div class="drawer-head">
       <h2>Add seasonal shows</h2>
@@ -62,7 +58,6 @@
       <button type="button" id="page-next">Next</button>
     </div>
   </aside>
-
   <aside id="settings" class="drawer drawer-settings hidden">
     <div class="drawer-head">
       <h2>Widget settings</h2>
@@ -140,10 +135,10 @@
       </label>
       <button type="submit" class="primary">Save</button>
     </form>
-    <p class="hint">Native dropdowns are unreliable inside a Plasma/Chrome widget, so these lists open in-page. Combined mode uses one pip row: dark = unaired, cyan = sub only, gold = dub (sub usually already out), blue = watched.</p>
+    <p class="hint">Native dropdowns are unreliable inside a Plasma/Chrome widget, so these lists open in-page.</p>
   </aside>
-
   <div id="toast" class="toast hidden"></div>
   <script src="/app.js"></script>
+  <script src="/chrome.js"></script>
 </body>
 </html>
