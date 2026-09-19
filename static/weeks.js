@@ -1,6 +1,12 @@
+/* Status-bar week pager + My shows layout lock.
+ *
+ * This file must NOT touch .day-col nodes. chrome.js paints the board,
+ * week-fix.js is the only owner of column order / dates / seating.
+ * If you reseat or rotate here you will get duplicate weekdays.
+ */
 (function () {
-  const NAMES = ['This week', 'Next week', 'Following'];
   let offset = Number(state.weekOffset || 0);
+  // Layout in force before we forced bar on My shows. Restored on leave.
   let layoutBeforeLibrary = null;
 
   const css = document.createElement('style');
@@ -28,24 +34,14 @@
     '<button type="button" data-range="library">My shows</button>';
 
   function isWeek() {
-    return state.range === 'this_week' || state.range === 'next_week' || state.range === 'week_after' || state.range === 'week';
+    return state.range === 'this_week' || state.range === 'next_week' ||
+      state.range === 'week_after' || state.range === 'week';
   }
+  // app.js uses this to pick the week-strip layout.
   window.isWeekRange = function (range) {
-    return range === 'this_week' || range === 'next_week' || range === 'week_after' || range === 'week';
+    return range === 'this_week' || range === 'next_week' ||
+      range === 'week_after' || range === 'week';
   };
-
-  function weekStartDate(off) {
-    const wantSun = (state.settings.weekStart || 'sunday') !== 'monday';
-    const now = new Date();
-    const startWeekday = wantSun ? 0 : 1;
-    const daysSince = (now.getDay() - startWeekday + 7) % 7;
-    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysSince);
-    start.setDate(start.getDate() + off * 7);
-    return start;
-  }
-  function localKey(d) {
-    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-  }
 
   function paintActive() {
     nav.querySelectorAll('button').forEach(function (b) { b.classList.remove('active'); });
@@ -53,23 +49,19 @@
     const mine = nav.querySelector('[data-range="library"]');
     const jump = document.querySelector('#week-now');
     const pager = document.querySelector('#week-pager');
-    const label = document.querySelector('#week-label');
     if (state.range === 'today' && today) today.classList.add('active');
     else if (state.range === 'library' && mine) mine.classList.add('active');
     if (jump) jump.classList.toggle('active', isWeek() && offset === 0);
     if (pager) pager.classList.toggle('is-on', isWeek());
-    if (label) {
-      if (isWeek() && state.schedule && state.schedule.label) label.textContent = state.schedule.label;
-      else label.textContent = NAMES[offset] || ('+' + offset + ' wk');
-    }
     const prev = document.querySelector('#week-prev');
     if (prev) prev.disabled = isWeek() && offset <= 0;
+    // Date text is written by week-fix.js from the same offset.
   }
 
   function applyLibraryLayout() {
     if (state.range === 'library') {
       if (layoutBeforeLibrary == null) layoutBeforeLibrary = state.settings.layout;
-      state.settings.layout = 'stacks';
+      state.settings.layout = 'stacks'; // bar, not persisted
     } else if (layoutBeforeLibrary != null) {
       state.settings.layout = layoutBeforeLibrary;
       layoutBeforeLibrary = null;
@@ -77,49 +69,10 @@
     if (typeof applyTheme === 'function') applyTheme();
   }
 
-  function reseat() {
-    const strip = document.querySelector('.week-strip');
-    if (!strip || !isWeek()) return;
-    const cols = [].slice.call(strip.querySelectorAll('.day-col'));
-    if (!cols.length) return;
-    const start = weekStartDate(offset);
-    const byDow = {};
-    cols.forEach(function (col, i) {
-      const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
-      col.dataset.date = localKey(d);
-      byDow[d.getDay()] = col;
-    });
-    const lib = state.library || [];
-    cols.forEach(function (col) {
-      [].slice.call(col.querySelectorAll('[data-sid]')).forEach(function (card) {
-        const show = lib.find(function (s) { return String(s.id) === String(card.dataset.sid); });
-        if (!show || show.airDow == null || show.airDow === '') return;
-        const destCol = byDow[Number(show.airDow)];
-        const dest = destCol && destCol.querySelector('.cards');
-        if (dest && card.parentNode !== dest) dest.appendChild(card);
-      });
-    });
-    cols.forEach(function (col) {
-      const box = col.querySelector('.cards');
-      if (!box) return;
-      const kids = [].slice.call(box.children);
-      kids.sort(function (a, b) { return Number(a.dataset.sid) - Number(b.dataset.sid); });
-      kids.forEach(function (k) { box.appendChild(k); });
-    });
-    if (offset === 0) {
-      const today = localKey(new Date());
-      const idx = cols.findIndex(function (c) { return c.dataset.date === today; });
-      if (idx > 0) {
-        const head = cols.slice(idx);
-        const tail = cols.slice(0, idx);
-        head.concat(tail).forEach(function (c) { strip.appendChild(c); });
-      }
-    }
-  }
-
+  // Fetch calendar week `offset` (0 = this Sun-Sat) and repaint.
   async function loadWeek() {
     state.weekOffset = offset;
-    state.range = offset === 0 ? 'this_week' : offset === 1 ? 'next_week' : offset === 2 ? 'week_after' : 'this_week';
+    state.range = 'this_week';
     applyLibraryLayout();
     paintActive();
     try {
@@ -134,11 +87,11 @@
       if (typeof toast === 'function') toast(e.message);
     }
     paintActive();
-    reseat();
   }
 
   function goToday() {
     state.range = 'today';
+    state.weekOffset = 0;
     applyLibraryLayout();
     paintActive();
     loadSchedule().then(paintActive);
@@ -149,7 +102,6 @@
     paintActive();
     loadSchedule().then(function () {
       paintActive();
-      if (typeof applyTheme === 'function') applyTheme();
       renderBoard();
     });
   }
@@ -177,7 +129,6 @@
       document.body.classList.add('layout-bar');
       document.body.classList.remove('layout-row');
     }
-    reseat();
     paintActive();
   };
 
