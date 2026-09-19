@@ -8,12 +8,13 @@
       'body.layout-bar .week-strip .day-col{flex:1 1 0!important;min-width:170px!important;overflow:hidden!important;}',
       'body.layout-bar .week-strip .cards{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;gap:8px!important;width:100%!important;}',
       'body.layout-bar .stack-card.compact{width:100%!important;max-width:160px!important;}',
-      'body.layout-row .week-strip{display:flex!important;flex-direction:column!important;width:100%!important;height:auto!important;}',
-      'body.layout-row .week-strip .day-col{flex:0 0 auto!important;width:100%!important;overflow:visible!important;}',
+      'body.layout-row .week-strip{display:flex!important;flex-direction:column!important;width:100%!important;}',
       'body.layout-row .week-strip .cards{display:flex!important;flex-wrap:wrap!important;gap:8px!important;width:100%!important;}',
-      '.stack-card.compact{width:140px!important;max-width:160px!important;overflow:hidden!important;}',
+      '.stack-card.compact{width:140px!important;max-width:160px!important;overflow:hidden!important;position:relative!important;}',
       '.stack-card.compact .poster{width:100%!important;aspect-ratio:2/3!important;object-fit:cover!important;}',
-      '.stack-card.compact h4{display:-webkit-box!important;-webkit-line-clamp:2!important;-webkit-box-orient:vertical!important;overflow:hidden!important;height:2.6em!important;line-height:1.3!important;word-break:break-word!important;}',
+      '.stack-card.compact h4{display:-webkit-box!important;-webkit-line-clamp:2!important;-webkit-box-orient:vertical!important;overflow:hidden!important;height:2.6em!important;line-height:1.3!important;word-break:break-word!important;cursor:pointer!important;color:var(--text,#e8eef6)!important;}',
+      '.stack-card.compact h4:hover{color:#7eb8ff!important;text-decoration:underline!important;}',
+      '.card-remove{position:absolute!important;top:6px!important;right:6px!important;width:22px!important;height:22px!important;border:0!important;border-radius:11px!important;background:#000a!important;color:#fff!important;cursor:pointer!important;line-height:22px!important;padding:0!important;font-size:14px!important;}',
       '.stack-card.finished,.row-card.finished{border:2px solid #3dd68c!important;}',
       '.stack-card.sub-done,.row-card.sub-done{border:2px solid #ff8a5b!important;}',
       '.remain-tiles{display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;justify-content:center!important;gap:6px!important;}',
@@ -35,24 +36,20 @@
     return l === 'stacks' || l === 'bar';
   }
   function viewEnd() {
-    if (state.schedule && state.schedule.end) {
-      const end = new Date(state.schedule.end);
-      if (!Number.isNaN(end.getTime())) return end;
+    if (state.range === 'library' || state.range === 'today' || !state.schedule || !state.schedule.end) {
+      return new Date();
     }
-    return new Date();
+    const end = new Date(state.schedule.end);
+    return Number.isNaN(end.getTime()) ? new Date() : end;
   }
   function viewAired(show, kind) {
     const total = show.episodes || 12;
     let aired = Number(kind === 'dub' ? show.dubAired : show.subAired);
     if (!Number.isFinite(aired)) aired = 0;
     const end = viewEnd();
-    const events = [];
-    (show.nextEvents || []).forEach(function (e) {
-      if ((e.kind || 'sub') === kind) events.push(e);
-    });
-    if (kind === 'sub') (show.upcomingSub || []).forEach(function (e) { events.push(e); });
-    events.forEach(function (e) {
-      if (!e.at) return;
+    (show.nextEvents || []).concat(kind === 'sub' ? (show.upcomingSub || []) : []).forEach(function (e) {
+      if (!e || !e.at) return;
+      if (e.kind && e.kind !== kind && !(kind === 'sub' && !e.kind)) return;
       const t = new Date(e.at);
       if (Number.isNaN(t.getTime()) || t > end) return;
       if (e.episode != null) aired = Math.max(aired, Number(e.episode));
@@ -81,6 +78,35 @@
     if (show.status === 'FINISHED' && dubExists && !dubDone) return ' sub-done';
     if (show.status === 'FINISHED') return ' finished';
     return '';
+  }
+  function fmtWhen(at) {
+    if (typeof fmtTime === 'function') return fmtTime(at);
+    const d = new Date(at);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+  function titleTip(show) {
+    const total = show.episodes || 12;
+    const subDone = viewAired(show, 'sub') >= Number(total) || show.status === 'FINISHED';
+    const dubExists = hasDub(show);
+    const dubDone = !dubExists || viewAired(show, 'dub') >= Number(total);
+    if (subDone && dubDone) {
+      return '<strong>' + show.title + '</strong><div class="meta"><span class="chip dub">Finished</span></div>';
+    }
+    const bits = [];
+    const subEv = (show.nextEvents || []).find(function (e) { return e.kind === 'sub'; }) || (show.nextSubAt ? { at: show.nextSubAt, episode: show.nextSubEpisode } : null);
+    const dubEv = (show.nextEvents || []).find(function (e) { return e.kind === 'dub'; });
+    if (!subDone && subEv && subEv.at) bits.push('<span class="chip sub">SUB ep ' + (subEv.episode || '?') + ' · ' + fmtWhen(subEv.at) + '</span>');
+    else if (subDone) bits.push('<span class="chip sub">SUB finished</span>');
+    if (dubExists) {
+      if (!dubDone && dubEv && dubEv.at) bits.push('<span class="chip dub">DUB ep ' + (dubEv.episode || '?') + ' · ' + fmtWhen(dubEv.at) + '</span>');
+      else if (dubDone) bits.push('<span class="chip dub">DUB finished</span>');
+    }
+    if (!bits.length) bits.push('<span class="chip">No upcoming air date</span>');
+    return '<strong>' + show.title + '</strong><div class="meta">' + bits.join('') + '</div>';
+  }
+  function nexusSearch(title) {
+    return 'https://anime.nexus/series?search=' + encodeURIComponent(title || '');
   }
   function localKey(d) {
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
@@ -145,7 +171,7 @@
     return Object.assign({}, sched, { days: days });
   }
   function pillTip(show, kind) {
-    const total = show.episodes || Math.max(show.subAired || 0, show.dubAired || 0, 12);
+    const total = show.episodes || 12;
     const aired = viewAired(show, kind);
     const left = Math.max(0, total - aired);
     const label = kind === 'dub' ? 'DUB' : 'SUB';
@@ -173,12 +199,31 @@
     const img = document.createElement('img');
     img.className = 'poster';
     img.src = show.cover || '';
+    if (state.range === 'library') {
+      const x = document.createElement('button');
+      x.type = 'button';
+      x.className = 'card-remove';
+      x.textContent = '×';
+      x.title = 'Remove from tracker';
+      x.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (typeof removeShow === 'function') removeShow(show.id);
+      });
+      card.appendChild(x);
+    }
     const title = document.createElement('h4');
     title.textContent = show.title;
-    title.title = show.title;
+    title.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      window.open(nexusSearch(show.title), '_blank', 'noopener');
+    });
+    title.addEventListener('mouseenter', function () { placeTip(titleTip(show), title); });
+    title.addEventListener('mouseleave', hideTip);
     const tiles = document.createElement('div');
     tiles.className = 'remain-tiles';
-    const total = show.episodes || Math.max(show.subAired || 0, show.dubAired || 0, 12);
+    const total = show.episodes || 12;
     function add(kind) {
       const aired = viewAired(show, kind);
       const el = document.createElement('span');
