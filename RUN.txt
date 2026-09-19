@@ -1,0 +1,41 @@
+Seasonal Tracker
+===============
+
+Clone
+  git clone https://github.com/LIQUIDNEON/seasonal-tracker.git
+  cd seasonal-tracker
+  chmod +x launch.sh
+  ./launch.sh
+
+  or
+
+  python3 widget.py
+
+That opens a local app window on http://127.0.0.1:8765/
+Use --no-browser if you only want the server.
+Use --port 9000 to change the port.
+
+On KDE (Nobara Official)
+  1. Run ./launch.sh
+  2. Resize the window to the slice of screen you want
+  3. Right-click the title bar → More Actions → Keep Above Others
+  4. Optional: pin it on one virtual desktop only
+  5. Autostart: copy seasonal-tracker.desktop to ~/.local/share/applications/
+     and add it in System Settings → Autostart
+     Set Exec= and Path= to the cloned folder first.
+
+First-time setup
+  1. Click Add shows
+  2. Pick the current or next season (or search any title)
+  3. Click posters to pin them — outlined cards are already pinned
+  4. Use Today / This week / Next week / Following / My shows
+  5. Click an episode square to mark it watched (click again to unmark)
+  6. Rows ↔ Stacks toggles the two remaining-episode layouts
+
+Data
+  Titles, posters, sub air times: AniList (MAL ids stored on every show)
+  English dub air times / dubbed episode counts: AnimeSchedule via AniSchedule feeds
+  Your pins and watch counts: ~/.config/seasonal-tracker/library.json
+
+Stop
+  Close the window, then Ctrl+C in the terminal if the server is still running.
