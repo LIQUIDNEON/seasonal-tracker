@@ -67,10 +67,11 @@
     const dub = airedNow(show, 'dub');
     const dubTile = card.querySelector('.remain-tile.dub');
     const subDone = sub >= Number(total);
-    const dubDone = dub >= Number(total);
-    card.classList.remove('finished', 'sub-done');
-    if (dubTile && subDone !== dubDone) card.classList.add('sub-done');
-    else if (subDone && (!dubTile || dubDone)) card.classList.add('finished');
+    const dubDone = !dubTile || dub >= Number(total);
+    card.classList.remove('airing', 'sub-done', 'finished');
+    if (subDone && dubDone) card.classList.add('finished');
+    else if (subDone || (dubTile && dub >= Number(total))) card.classList.add('sub-done');
+    else card.classList.add('airing');
     card.querySelectorAll('.remain-tile').forEach(function (el) {
       const kind = el.classList.contains('dub') ? 'dub' : 'sub';
       const aired = kind === 'dub' ? dub : sub;
