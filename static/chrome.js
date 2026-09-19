@@ -7,13 +7,13 @@
       'body.layout-bar .week-strip{display:flex!important;flex-direction:row!important;align-items:flex-start!important;width:100%!important;}',
       'body.layout-bar .week-strip .day-col{flex:1 1 0!important;min-width:170px!important;overflow:hidden!important;}',
       'body.layout-bar .week-strip .cards{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;gap:8px!important;width:100%!important;}',
-      'body.layout-bar .stack-card.compact{width:100%!important;max-width:160px!important;zoom:1!important;}',
+      'body.layout-bar .stack-card.compact{width:100%!important;max-width:160px!important;}',
       'body.layout-row .week-strip{display:flex!important;flex-direction:column!important;width:100%!important;height:auto!important;}',
       'body.layout-row .week-strip .day-col{flex:0 0 auto!important;width:100%!important;overflow:visible!important;}',
       'body.layout-row .week-strip .cards{display:flex!important;flex-wrap:wrap!important;gap:8px!important;width:100%!important;}',
-      '.stack-card.compact{width:140px!important;max-width:160px!important;min-width:0!important;overflow:hidden!important;}',
+      '.stack-card.compact{width:140px!important;max-width:160px!important;overflow:hidden!important;}',
       '.stack-card.compact .poster{width:100%!important;aspect-ratio:2/3!important;object-fit:cover!important;}',
-      '.stack-card.compact h4{display:-webkit-box!important;-webkit-line-clamp:2!important;-webkit-box-orient:vertical!important;overflow:hidden!important;height:2.6em!important;line-height:1.3!important;word-break:break-word!important;margin:4px 0 0!important;}',
+      '.stack-card.compact h4{display:-webkit-box!important;-webkit-line-clamp:2!important;-webkit-box-orient:vertical!important;overflow:hidden!important;height:2.6em!important;line-height:1.3!important;word-break:break-word!important;}',
       '.stack-card.finished,.row-card.finished{border:2px solid #3dd68c!important;}',
       '.stack-card.sub-done,.row-card.sub-done{border:2px solid #ff8a5b!important;}',
       '.remain-tiles{display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;justify-content:center!important;gap:6px!important;}',
@@ -60,16 +60,6 @@
     if (kind === 'sub' && show.nextSubAt && show.nextSubEpisode) {
       let nextAt = new Date(show.nextSubAt);
       let nextEp = Number(show.nextSubEpisode);
-      while (!Number.isNaN(nextAt.getTime()) && nextAt <= end && aired < total) {
-        aired = Math.max(aired, nextEp);
-        nextEp += 1;
-        nextAt = new Date(nextAt.getTime() + 7 * 24 * 3600 * 1000);
-      }
-    }
-    if (kind === 'dub' && (show.nextEvents || []).some(function (e) { return e.kind === 'dub'; })) {
-      const dub = (show.nextEvents || []).find(function (e) { return e.kind === 'dub'; });
-      let nextAt = new Date(dub.at);
-      let nextEp = Number(dub.episode || aired + 1);
       while (!Number.isNaN(nextAt.getTime()) && nextAt <= end && aired < total) {
         aired = Math.max(aired, nextEp);
         nextEp += 1;
@@ -146,18 +136,22 @@
         bucket.shows.push(show);
       });
     });
-    return Object.assign({}, sched, { days: Object.keys(buckets).sort().map(function (k) { return buckets[k]; }) });
+    let days = Object.keys(buckets).sort().map(function (k) { return buckets[k]; });
+    if (state.range === 'this_week' && !isBar()) {
+      const today = localKey(new Date());
+      const idx = days.findIndex(function (d) { return d.date === today; });
+      if (idx > 0) days = days.slice(idx).concat(days.slice(0, idx));
+    }
+    return Object.assign({}, sched, { days: days });
   }
   function pillTip(show, kind) {
     const total = show.episodes || Math.max(show.subAired || 0, show.dubAired || 0, 12);
     const aired = viewAired(show, kind);
     const left = Math.max(0, total - aired);
-    const watched = kind === 'dub' ? show.watchedDub : show.watchedSub;
     const label = kind === 'dub' ? 'DUB' : 'SUB';
     return '<strong>' + show.title + '</strong><div class="meta">' +
       '<span class="chip ' + kind + '">' + label + ' ' + aired + ' / ' + total + ' aired</span>' +
-      '<span class="chip ' + kind + '">' + left + ' left</span>' +
-      '<span class="chip">watched ' + (watched || 0) + '</span></div>';
+      '<span class="chip ' + kind + '">' + left + ' left</span></div>';
   }
   function placeTip(html, el) {
     const tip = document.querySelector('#hover-tip');
