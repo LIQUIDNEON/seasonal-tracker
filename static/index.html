@@ -134,8 +134,12 @@
         </div>
       </label>
       <button type="submit" class="primary">Save</button>
+      <div class="reload-row">
+        <button type="button" id="btn-reload-ui">Reload UI</button>
+        <button type="button" id="btn-reload-widget" class="primary">Reload widget</button>
+      </div>
     </form>
-    <p class="hint">Native dropdowns are unreliable inside a Plasma/Chrome widget, so these lists open in-page.</p>
+    <p class="hint">Reload UI picks up HTML/CSS/JS. Reload widget also restarts the Python backend. Library data in ~/.config is left alone.</p>
   </aside>
   <div id="toast" class="toast hidden"></div>
   <script src="/app.js"></script>
