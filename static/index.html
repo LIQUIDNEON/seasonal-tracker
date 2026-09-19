@@ -9,8 +9,8 @@
 </head>
 <body>
   <div id="app">
-    <header class="topbar">
-      <small id="season-chip" class="season-chip">—</small>
+    <main id="board" class="board"></main>
+    <footer class="statusbar" id="chrome">
       <nav class="ranges" id="ranges">
         <button type="button" data-range="today" class="active">Today</button>
         <button type="button" data-range="this_week">This week</button>
@@ -18,25 +18,29 @@
         <button type="button" data-range="week_after">Following</button>
         <button type="button" data-range="library">My shows</button>
       </nav>
+      <span id="range-label" class="bar-label">Loading…</span>
+      <span id="season-chip" class="season-chip">—</span>
       <div class="tools">
+        <button type="button" id="btn-compact" class="icon-btn" title="Compact" aria-label="Compact">▣</button>
         <button type="button" id="btn-layout" class="icon-btn" title="Rows / Stacks" aria-label="Layout">
-          <svg class="i-rows" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><rect x="1" y="2" width="14" height="3" rx="1"/><rect x="1" y="6.5" width="14" height="3" rx="1"/><rect x="1" y="11" width="14" height="3" rx="1"/></svg>
-          <svg class="i-stacks" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><rect x="1" y="1" width="4" height="14" rx="1"/><rect x="6" y="1" width="4" height="14" rx="1"/><rect x="11" y="1" width="4" height="14" rx="1"/></svg>
+          <svg class="i-rows" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+            <rect x="1" y="1" width="8" height="8" rx="1.5"/>
+            <rect x="11" y="1" width="8" height="8" rx="1.5"/>
+            <rect x="1" y="11" width="8" height="8" rx="1.5"/>
+            <rect x="11" y="11" width="8" height="8" rx="1.5"/>
+          </svg>
+          <svg class="i-stacks" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+            <rect x="1" y="6" width="5" height="13" rx="1.2"/>
+            <rect x="7.5" y="1" width="5" height="18" rx="1.2"/>
+            <rect x="14" y="4" width="5" height="15" rx="1.2"/>
+          </svg>
         </button>
-        <button type="button" id="btn-poster" class="icon-btn stack-only" title="Poster on bottom" aria-label="Poster position">
-          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 2v12M4 6l4-4 4 4M4 10l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </button>
+        <button type="button" id="btn-minimal" class="icon-btn" title="Minimal — hide chrome" aria-label="Minimal">▁</button>
+        <button type="button" id="btn-float" class="icon-btn" title="Float — free window you can drag and resize" aria-label="Float">⧉</button>
         <button type="button" id="btn-settings" class="icon-btn" title="Settings" aria-label="Settings">⚙</button>
       </div>
-    </header>
-    <section class="statusline">
-      <span id="range-label">Loading…</span>
-      <span id="status-note"></span>
-    </section>
-    <main id="board" class="board"></main>
+    </footer>
   </div>
-  <button type="button" id="btn-compact" class="fab fab-compact" title="Compact mode">▣</button>
-  <button type="button" id="btn-minimal" class="fab fab-minimal" title="Minimal mode — hide chrome and borders">▁</button>
   <aside id="drawer" class="drawer drawer-picker hidden">
     <div class="drawer-head">
       <h2>Add seasonal shows</h2>
@@ -44,7 +48,7 @@
     </div>
     <div class="picker-bar">
       <select id="season-select"></select>
-      <input id="search" type="search" placeholder="Search MyAnimeList / AniList titles…" />
+      <input id="search" type="search" placeholder="Search titles…" />
       <div class="seg" id="picker-layout">
         <button type="button" data-pick="tiles" class="active">Tiles</button>
         <button type="button" data-pick="rows">Rows</button>
@@ -79,8 +83,8 @@
         <div class="select" data-name="stackPoster">
           <button type="button" class="select-btn"></button>
           <ul class="select-menu">
-            <li data-value="bottom">Poster at bottom (bottom-aligned)</li>
-            <li data-value="top">Poster at top (top-aligned)</li>
+            <li data-value="bottom">Poster at bottom</li>
+            <li data-value="top">Poster at top</li>
           </ul>
           <input type="hidden" name="stackPoster" />
         </div>
@@ -110,7 +114,7 @@
           <button type="button" class="select-btn"></button>
           <ul class="select-menu">
             <li data-value="split">Separate SUB and DUB rows</li>
-            <li data-value="combined">Combined row (colour = air state)</li>
+            <li data-value="combined">Combined row</li>
           </ul>
           <input type="hidden" name="progressMode" />
         </div>
